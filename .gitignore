@@ -1,2 +1,3 @@
-bin/
-deps/*/*.o
+build/
+deps/libbpf/src/build/
+deps/common/*.o

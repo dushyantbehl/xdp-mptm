@@ -6,7 +6,7 @@ XDP_TARGETS  := xdp_geneve xdp_redirect
 USER_TARGETS := xdp_geneve_user
 USER_LIBS    := -lbpf -lm
 
-LIBBPF_DIR  = ${DEPS}/libbpf/src/
+LIBBPF_DIR  = ${DEPS}/libbpf/src
 COMMON_DIR  = ${DEPS}/common
 HEADERS_DIR = ${DEPS}/headers
 
