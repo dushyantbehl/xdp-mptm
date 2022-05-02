@@ -14,3 +14,6 @@ EXTRA_DEPS  += $(COMMON_DIR)/parsing_helpers.h
 
 include $(COMMON_DIR)/common.mk
 #COMMON_OBJS := $(COMMON_DIR)/common.o
+
+tags:
+	
