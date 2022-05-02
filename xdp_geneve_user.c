@@ -99,8 +99,11 @@ __be32 inline parse_ipv4(char ipadr[]) {
             fprintf(stderr, "Passed ipaddr %s is invalid.\n", ipadr);
             return -1;
         }
-        addr = addr<<8 + val;
+        addr = ((addr<<8) + val);
         tok = strtok(NULL,".");
+    }
+    if (addr == 0) {
+        fprintf(stderr, "Passed ipaddr is 0.0.0.0, might not be valid\n");
     }
     return(addr);
 }
@@ -169,7 +172,7 @@ int parse_params(int argc, char *argv[]) {
             }
             break;
         default:
-            fprintf(stderr, "INVALID parameter supplied %s\n", opt);
+            fprintf(stderr, "INVALID parameter supplied %c\n", opt);
             return -1;
       }
     }
@@ -252,8 +255,6 @@ int update_map(int mapfd, int operation, void *key, void *value,
 }
 
 int main(int argc, char **argv) {
-    int ret;
-    int tunnel_map_fd, redirect_map_fd;
 
     if (parse_params(argc, argv) != 0) {
         fprintf(stderr, "ERR: parsing params\n");
@@ -265,7 +266,7 @@ int main(int argc, char **argv) {
 
     if (redirect_iface_id != -1) {
         /* Make map for redirection port entries */
-        redirect_map_fd = open_bpf_map_file(PIN_BASE_DIR, REDIRECT_MAP, NULL);
+        int redirect_map_fd = open_bpf_map_file(PIN_BASE_DIR, REDIRECT_MAP, NULL);
         if (redirect_map_fd < 0) {
               fprintf(stderr, "ERR: opening redirect map\n");
             return EXIT_FAIL_BPF;
@@ -276,7 +277,7 @@ int main(int argc, char **argv) {
     }
 
     /* Open the map for geneve config */
-    tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_IFACE_MAP, NULL);
+    int tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_IFACE_MAP, NULL);
     if (tunnel_map_fd < 0) {
           fprintf(stderr, "ERR: opening tunnel iface map\n");
         return EXIT_FAIL_BPF;
