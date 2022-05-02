@@ -30,6 +30,8 @@ rm /sys/fs/bpf/tunnel_map_iface
 prog loadall
 bpftool map pin id map /sys/fs/bpf/tunnel_map_iface
 xdpdump net attach
+
+export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
 xdp_geneve_user -s IP_ADDRESS_OF_VETH_INSIDE_NS -d IP_OF_OTHER_NODE -e VETH_MAC_INSIDE_NS -t VETH_MAC_IN_ROOT_NS?
 #xdp_geneve_user -f 0 -v 0 -p 51234 -i 19 -c 2 -s 10.200.1.2 -d 10.162.185.12 -e 22:31:45:ea:9e:23 -t a6:89:61:a3:e2:d5 -o  ADD
 #MANGLE rule should ensure outer ip src becomes eth0 ip
