@@ -231,7 +231,8 @@ tunnel_info* create_tun_info(char* s_mac, char* d_mac, char* inner_d_mac,
 }
 
 /* Calls bpf update/delete elem based on the operation. */
-int update_map(int mapfd, int operation, void *key, void *value, uint64_t flags, char *map_name) {
+int update_map(int mapfd, int operation, void *key, void *value,
+               uint64_t flags, char *map_name) {
     int ret;
     switch (operation) {
       case DELETE:
@@ -270,7 +271,8 @@ int main(int argc, char **argv) {
             return EXIT_FAIL_BPF;
         }
         printf("redirect iface id is set to %d", redirect_iface_id);
-        return update_map(redirect_map_fd, operation, &redirect_iface_id, &iface, 0, "redirect");
+        return update_map(redirect_map_fd, operation, &redirect_iface_id,
+                          &iface, 0, "redirect");
     }
 
     /* Open the map for geneve config */
