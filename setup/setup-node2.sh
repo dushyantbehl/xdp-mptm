@@ -8,8 +8,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 
+# this will be the address which geneve header writes
 GENEVE_ADDR="10.200.2.10"
-REMOTE_ADDR="10.162.185.158"
+# this is the address of eth0 on node1
+REMOTE_ADDR="10.10.10.1"
+# Geneve CIDR
 REMOTE_CIDR="10.200.1.0/24"
 
 ip link add name geneve0 type geneve id 0 remote ${REMOTE_ADDR}

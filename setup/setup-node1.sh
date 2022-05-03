@@ -53,5 +53,3 @@ iptables -t mangle -A POSTROUTING  -j CHECKSUM --checksum-fill
 
 iptables -A FORWARD -i ${IFACE} -o ${VETH} -j ACCEPT
 iptables -A FORWARD -o ${IFACE} -i ${VETH} -j ACCEPT
-
-

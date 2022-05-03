@@ -1,31 +1,22 @@
-XDP code for tunnel experiments go here.
+This repository contains code for Multi Protocol Tunnel Multiplexer (MPTM) implemented using [ebpf](https://ebpf.io/).
+MPTM implements code for multiple tunnel protocols and hooks them in linux at [XDP](https://www.iovisor.org/technology/xdp) hook points.
 
-Our code is built off the XDP tutorial available at: [[https://github.com/xdp-project/xdp-tutorial][XDP Tutorial]].
+This code is built on top of the XDP tutorial available at: [[https://github.com/xdp-project/xdp-tutorial][XDP Tutorial]].
 
 Adding info regarding appropriate licenses etc. is WIP.
-
 
 * Based on libbpf
 This XDP-tutorial leverages [[https://github.com/libbpf/libbpf/][libbpf]]
 
-
 * Build
-run ``make`` in xdp folder, after installing necessary dependencies.
+Run ``make`` in root folder.
 
-* How to run *
-# Flush nat rules.
-iptables -t nat -F
+* How to run
+![System setup for testing](docs/setup.png "System setup for testing")
 
-# Enable masquerading of 10.200.1.0.
-iptables -t nat -A POSTROUTING -s ${VPEER_ADDR}/24 -o ${IFACE} -j MASQUERADE
-iptables -t mangle -A POSTROUTING  -j CHECKSUM --checksum-fill
-
-
-iptables -A FORWARD -i ${IFACE} -o ${VETH} -j ACCEPT
-iptables -A FORWARD -o ${IFACE} -i ${VETH} -j ACCEPTx
-
-rm /sys/fs/bpf/genevenew -rf
-rm /sys/fs/bpf/tunnel_map_iface
+We provide 2 files to setup system according to the architecture above. 
+[setup-node1](./setup/setup-node1.sh) is for setting up Node 1 while,
+[setup-node2](./setup/setup-node2.sh) is for setting up Node 2.
 
 prog loadall
 bpftool map pin id map /sys/fs/bpf/tunnel_map_iface
