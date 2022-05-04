@@ -3,6 +3,7 @@
 This repository contains code for **Multi Protocol Tunnel Multiplexer (MPTM)** implemented using [ebpf](https://ebpf.io/).
 MPTM implements code for multiple tunnel protocols and hooks them in linux at [XDP](https://www.iovisor.org/technology/xdp) hook points.
 
+For detailed description of intent, usage etc. please check: [blog1](https://medium.com/@palani.kodeswaran/towards-building-a-ebpf-based-network-datapath-f6135067c03e),[blog2](https://medium.com/@palani.kodeswaran/towards-an-ebpf-based-datapath-part-2-2afd10ada603)
 This code is built on top of the [XDP Tutorial](https://github.com/xdp-project/xdp-tutorial) .
 
 Adding info regarding appropriate licenses etc. is WIP.
