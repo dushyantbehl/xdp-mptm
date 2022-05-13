@@ -177,24 +177,27 @@ int parse_params(int argc, char *argv[]) {
       }
     }
 
-    // TODO: explain
-    if(redirect_iface_id == 1) {
+    if(redirect_iface_id != 1) { // if redirect is set.
         if (operation == ADD && (c_iface == -1 || iface == -1)) {
-              return -1;
+            // for ADD we need capture iface and iface with redirect iface id.
+            return -1;
         }else if(iface == -1) {
-              return -1;
+            // for delete we only need the iface which is they key in map
+            return -1;
+        }
+    } else { // if redirect is not set
+        if(operation == ADD && (vlid == -1 || flags == -1 || iface == -1 ||
+           c_iface == -1 || s_addr[0] == '\0' || d_addr[0] == '\0' ||
+           d_mac[0] == '\0' || s_mac[0] == '\0')) {
+            // if we need to add then we need all the other info to create
+            // tunnel structure.
+            return -1;
+        } else if(iface == -1) {
+            // for delete we only need iface.
+            return 1;
         }
     }
-
-    // TODO: explain
-    if(operation == ADD && (vlid == -1 || flags == -1 || iface == -1 ||
-       c_iface == -1 || s_addr[0] == '\0' || d_addr[0] == '\0' ||
-       d_mac[0] == '\0' || s_mac[0] == '\0')) {
-        return -1;
-    } else if(iface == -1) {
-        return 1;
-    }
-       return 0;
+    return 0;
 }
 
 tunnel_info* create_tun_info(char* s_mac, char* d_mac, char* inner_d_mac,
@@ -271,7 +274,7 @@ int main(int argc, char **argv) {
               fprintf(stderr, "ERR: opening redirect map\n");
             return EXIT_FAIL_BPF;
         }
-        printf("redirect iface id is set to %d", redirect_iface_id);
+        printf("redirect iface id is set to %d\n", redirect_iface_id);
         return update_map(redirect_map_fd, operation, &redirect_iface_id,
                           &iface, 0, "redirect");
     }

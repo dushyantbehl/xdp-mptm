@@ -8,7 +8,6 @@
 #include <bpf/bpf_endian.h>
 //#include <iproute2/bpf_elf.h>
 
-
 // The parsing helper functions from the packet01 lesson have moved here
 #include <common/parsing_helpers.h>
 #include <common/rewrite_helpers.h>
@@ -18,15 +17,15 @@
 #include <common/xdp_stats_kern.h>
 
 #define MAX_ENTRIES 30
-struct bpf_map_def SEC("maps") tunnel_map_iface = {
+struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
     .type        = BPF_MAP_TYPE_HASH,
     .key_size    = sizeof(__u32),
     .value_size  = sizeof(tunnel_info),
     .max_entries = MAX_ENTRIES,
 };
 
-SEC("xdp_geneve")
-int axon_xdp_geneve_push(struct xdp_md *ctx) {
+SEC("mptm_xdp_push")
+int mptm_xdp_geneve_push(struct xdp_md *ctx) {
     void *data_end = (void *)((long)ctx->data_end);
     void *data = (void *)((long)ctx->data);
 
@@ -43,9 +42,9 @@ int axon_xdp_geneve_push(struct xdp_md *ctx) {
       goto out;
     tunnel_info* tn;
     __u32 key = ctx->ingress_ifindex;
-    tn = bpf_map_lookup_elem(&tunnel_map_iface, &key);
+    tn = bpf_map_lookup_elem(&mptm_tunnel_iface_map, &key);
     if(tn == NULL){
-      bpf_debug("[ERR] map entry missing for iface=%d\n", key);
+      bpf_debug("[ERR] map entry missing for iface %d\n", key);
       goto out;
     }
 
@@ -65,8 +64,8 @@ int axon_xdp_geneve_push(struct xdp_md *ctx) {
     return xdp_stats_record_action(ctx, action);
 }
 
-SEC("xdp_pass")
-int xdp_pass_func(struct xdp_md *ctx) {
+SEC("mptm_xdp_pass")
+int mptm_xdp_pass_func(struct xdp_md *ctx) {
     return XDP_PASS;
 }
 
