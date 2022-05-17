@@ -28,8 +28,6 @@ function check_root {
 }
 
 function clear {
-	set +e
-
 	log "deleting namespace ${NODE_NS}"
 	ip netns del ${NODE_NS} &>/dev/null
 
@@ -53,11 +51,11 @@ function clear {
 
 	log "Clear arp table"
 	arp -d
-
-	set -e
 }
 
 function setup {
+	set -e
+
 	# Create namespace
 	ip netns add ${NODE_NS}
 	log "created namespace ${NODE_NS}"
@@ -71,28 +69,33 @@ function setup {
 	log "moved veth ${NODE_VPEER} in ${NODE_NS}"
 
 	# Setup IP address of ${NODE_VETH}.
-	ip addr add ${NODE_VETH_ADDR}/24 dev ${NODE_VETH}
+	#ip addr add ${NODE_VETH_ADDR}/24 dev ${NODE_VETH}
 	ip link set ${NODE_VETH} up
 	log "setup ${NODE_VETH}"
 
-	# Setup IP ${NODE_VPEER}.
-	ip netns exec ${NODE_NS} ip addr add ${NODE_VPEER_ADDR}/24 dev ${NODE_VPEER}
-	ip netns exec ${NODE_NS} ip link set ${NODE_VPEER} up
-	ip netns exec ${NODE_NS} ip link set lo up
-	ip netns exec ${NODE_NS} ip route add ${NODE_VETH_ADDR} dev ${NODE_VPEER}
-	ip netns exec ${NODE_NS} ip route add default via ${NODE_VETH_ADDR}
-	log "set veth ${NODE_VPEER} networking"
+	ip link add name ${NODE_GENEVE} type geneve id 0 remote ${NODE_GENEVE_REMOTE_ADDR}
+	ip link set ${NODE_GENEVE} up
+	ip route add ${NODE_GENEVE_REMOTE_CIDR} dev ${NODE_GENEVE}
+	log "setup ${NODE_GENEVE}"
 
 	# Create bridge
 	ip link add ${GENEVE_BRIDGE} type bridge
 	ip addr add ${NODE_BR0_ADDR}/24 dev ${GENEVE_BRIDGE}
 	ip link set ${GENEVE_BRIDGE} up
-	brctl addif ${GENEVE_BRIDGE} ${NODE_VETH}
-	brctl addif ${GENEVE_BRIDGE} ${NODE_GENEVE}
+	ip link set ${NODE_VETH} master ${GENEVE_BRIDGE}
+	ip link set ${NODE_GENEVE} master ${GENEVE_BRIDGE}
+
+	# Setup IP ${NODE_VPEER}.
+	ip netns exec ${NODE_NS} ip link set lo up
+	ip netns exec ${NODE_NS} ip link set ${NODE_VPEER} up
+	ip netns exec ${NODE_NS} ip addr add ${NODE_VPEER_ADDR}/24 dev ${NODE_VPEER}
+	ip netns exec ${NODE_NS} ip route add ${NODE_BR0_ADDR} dev ${NODE_VPEER}
+	ip netns exec ${NODE_NS} ip route add default via ${NODE_BR0_ADDR}
+	log "set veth ${NODE_VPEER} networking"
 
 	# Enable IP-forwarding.
 	echo 1 > /proc/sys/net/ipv4/ip_forward
-	log "set veth ${NODE_VPEER} networking"
+	log "enable ip forwarding"
 
 	# Flush forward rules.
 	iptables -P FORWARD ACCEPT
@@ -109,22 +112,25 @@ function setup {
 	#iptables -t nat -A POSTROUTING -s ${NODE_VETH_ADDR}/24 -o ${NODE_IFACE} -j MASQUERADE
 	#iptables -t mangle -A POSTROUTING  -j CHECKSUM --checksum-fill
 
-	iptables -A FORWARD -i ${NODE_IFACE} -o ${NODE_VETH} -j ACCEPT
-	iptables -A FORWARD -o ${NODE_IFACE} -i ${NODE_VETH} -j ACCEPT
-	iptables -A FORWARD -i ${NODE_VETH} -o ${NODE_GENEVE} -j ACCEPT
+	iptables -A FORWARD -i ${NODE_IFACE}    -o ${GENEVE_BRIDGE} -j ACCEPT
+	iptables -A FORWARD -i ${GENEVE_BRIDGE} -o ${NODE_IFACE}    -j ACCEPT
 
-	ip link add name ${NODE_GENEVE} type geneve id 0 remote ${NODE_GENEVE_REMOTE_ADDR}
-	ip link set ${NODE_GENEVE} up
-	ip route add ${NODE_GENEVE_REMOTE_CIDR} dev ${NODE_GENEVE}
+	iptables -A FORWARD -i ${NODE_IFACE}  -o ${NODE_VETH}   -j ACCEPT
+	iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_IFACE}  -j ACCEPT
 
-	iptables -A FORWARD -i ${NODE_IFACE} -o ${GENEVE_BRIDGE} -j ACCEPT
-	iptables -A FORWARD -o ${NODE_IFACE} -i ${GENEVE_BRIDGE} -j ACCEPT
-
+	iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_GENEVE} -j ACCEPT
+	iptables -A FORWARD -i ${NODE_GENEVE} -o ${NODE_VETH}   -j ACCEPT
 	log "Added more iptable rules"
+
+	set +e
 }
 
 ACTION=${1}
 check_root
+
+NODE=${2}
+source ./env-node${NODE}.sh
+log "loaded environment"
 
 if [ "${ACTION}" = "clear" ];
 then

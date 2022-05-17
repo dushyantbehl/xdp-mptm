@@ -179,15 +179,21 @@ Found 1 element
 $ xdpdump -i v-eth1 -x --rx-capture entry,exit
 ```
 
-#MANGLE rule should ensure outer ip src becomes eth0 ip
-
 ## Generating Traffic:
 
 ```
-ip netns exec NS1 ping 10.200.
+ip netns exec NS1 ping 10.200.1.2
 ```
-
 
 # License
 
 Adding info regarding appropriate licenses etc. is WIP.
+
+# Extra
+
+Cleaning iptables completely
+
+```
+iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+
+```
