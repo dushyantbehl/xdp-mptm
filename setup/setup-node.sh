@@ -53,6 +53,22 @@ function clear {
 	arp -d
 }
 
+function setup_host {
+	# Enable IP-forwarding.
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	log "enable ip forwarding"
+
+	# Flush forward rules.
+	iptables -P FORWARD ACCEPT
+	log "change default forward policy"
+	iptables -F FORWARD
+	log "flush iptables rules"
+
+	# Flush nat rules.
+	iptables -t nat -F
+	log "flush nat rules"
+}
+
 function setup {
 	set -e
 
@@ -93,34 +109,20 @@ function setup {
 	ip netns exec ${NODE_NS} ip route add default via ${NODE_BR0_ADDR}
 	log "set veth ${NODE_VPEER} networking"
 
-	# Enable IP-forwarding.
-	echo 1 > /proc/sys/net/ipv4/ip_forward
-	log "enable ip forwarding"
-
-	# Flush forward rules.
-	iptables -P FORWARD ACCEPT
-	log "change default forward policy"
-	iptables -F FORWARD
-	log "flush iptables rules"
-
-	# Flush nat rules.
-	iptables -t nat -F
-	log "flush nat rules"
-
 	# Enable masquerading of 10.200.1.0.
 	# MANGLE rule should ensure outer ip src becomes eth0 ip
 	#iptables -t nat -A POSTROUTING -s ${NODE_VETH_ADDR}/24 -o ${NODE_IFACE} -j MASQUERADE
 	#iptables -t mangle -A POSTROUTING  -j CHECKSUM --checksum-fill
 
-	iptables -A FORWARD -i ${NODE_IFACE}    -o ${GENEVE_BRIDGE} -j ACCEPT
-	iptables -A FORWARD -i ${GENEVE_BRIDGE} -o ${NODE_IFACE}    -j ACCEPT
+	#iptables -A FORWARD -i ${NODE_IFACE}    -o ${GENEVE_BRIDGE} -j ACCEPT
+	#iptables -A FORWARD -i ${GENEVE_BRIDGE} -o ${NODE_IFACE}    -j ACCEPT
 
-	iptables -A FORWARD -i ${NODE_IFACE}  -o ${NODE_VETH}   -j ACCEPT
-	iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_IFACE}  -j ACCEPT
+	#iptables -A FORWARD -i ${NODE_IFACE}  -o ${NODE_VETH}   -j ACCEPT
+	#iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_IFACE}  -j ACCEPT
 
-	iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_GENEVE} -j ACCEPT
-	iptables -A FORWARD -i ${NODE_GENEVE} -o ${NODE_VETH}   -j ACCEPT
-	log "Added more iptable rules"
+	#iptables -A FORWARD -i ${NODE_VETH}   -o ${NODE_GENEVE} -j ACCEPT
+	#iptables -A FORWARD -i ${NODE_GENEVE} -o ${NODE_VETH}   -j ACCEPT
+	#log "Added more iptable rules"
 
 	set +e
 }
@@ -137,10 +139,12 @@ then
     clear
 elif [ "${ACTION}" = "setup" ];
 then
+	setup_host
     setup
 elif [ "${ACTION}" = "both" ];
 then
 	clear
+	setup_host
     setup
 else
     log "USAGE ./setup_node2.sh clear/setup/both"

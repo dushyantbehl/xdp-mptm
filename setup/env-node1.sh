@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export NODE_IFACE="ens6f1"
+
 export NODE_NS="ns1"
 export NODE_VETH="veth-node1"
 export NODE_VPEER="veth-ns1"
