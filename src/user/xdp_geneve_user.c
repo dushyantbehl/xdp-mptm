@@ -36,7 +36,7 @@ void  print_usage() {
   printf("[USAGE]: v:f:p:i:c:s:d:e:t:o:q\n");
   printf("v:vlanid f:flags p:source_port i:capture_iface_index(for egress say veth0)"
          " c:redirect_iface_index(for egress say eth0) s:s_ipaddr d:d_ipdaddr e:s_mac"
-         " t:d_mac o: action q:inner_d_mac [ADD/DEL]\n");
+         " t:outer_d_mac q:inner_d_mac a:action [ADD/DEL]\n");
 }
 
 static const struct option long_options[] = {
@@ -101,7 +101,7 @@ int parse_params(int argc, char *argv[]) {
     if(action == MAP_ADD ) {
         if (vlid == -1 || flags == -1 || capture_iface == -1 ||
             eth_iface == -1 || s_addr[0] == '\0' || d_addr[0] == '\0' ||
-            d_mac[0] == '\0' || s_mac[0] == '\0') {
+            outer_d_mac[0] == '\0' || s_mac[0] == '\0' || inner_d_mac == '\0') {
             // if we need to add then we need all the other info to create
             // tunnel structure.
             fprintf(stderr, "operation is add but all argumnets are not provided\n");

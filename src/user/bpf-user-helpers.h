@@ -44,7 +44,7 @@ int update_map(int mapfd, int action, void *key, void *value,
 
 /************************** Parsing functions ****************************/
 
-static int validate_mac_u8(char *str, unsigned char *x) {
+int validate_mac_u8(char *str, unsigned char *x) {
     unsigned long z;
     z = strtoul(str, NULL, 16);
     if (z > 0xff)
@@ -54,7 +54,7 @@ static int validate_mac_u8(char *str, unsigned char *x) {
     return 0;
 }
 
-static int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
+int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
     if (validate_mac_u8(str, &mac[0]) < 0)
         return -1;
     if (validate_mac_u8(str + 3, &mac[1]) < 0)
@@ -78,7 +78,7 @@ static int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
   __be32 is nothing but uint32_t but naming here helps in 
   identifying the way this integer is to be created.
 */
-static __be32 parse_ipv4(char ipadr[]) {
+__be32 parse_ipv4(char ipadr[]) {
     __be32 addr = 0, val;
     char *tok = strtok(ipadr,".");
     for (int i=0; i<4; i++) {
