@@ -3,7 +3,7 @@
 This repository contains code for **Multi Protocol Tunnel Multiplexer (MPTM)** implemented using [ebpf](https://ebpf.io/).
 MPTM implements code for multiple tunnel protocols and hooks them in linux at [XDP](https://www.iovisor.org/technology/xdp) hook points.
 
-For detailed description of intent, usage etc. please check the blogs:
+For detailed description of depedencies, intent, usage etc. please check the blogs:
 
 1. [Towards building an eBPF Based Network Data Plane](https://medium.com/@palani.kodeswaran/towards-building-a-ebpf-based-network-datapath-f6135067c03e)
 1. [Towards building an eBPF based Newtork Data plane: Part 2](https://medium.com/@palani.kodeswaran/towards-an-ebpf-based-datapath-part-2-2afd10ada603)
@@ -93,7 +93,7 @@ $ ls /sys/fs/bpf/
 redirect_map  tunnel_map_iface  xdp-geneve  xdp-redirect
 ```
 
-We need to populate the maps with information regarding tunnel, ip address to mangle, mac addresses and interfaces to look for.
+We need to populate the maps with information regarding tunnel outer packet header, ip address to mangle, mac addresses and interfaces to look for.
 We will use the [`xdp_geneve_user`](./xdp_geneve_user.c) binary we compiled in the [build](#build) step to do that.
 
 The binary `xdp_geneve_user` needs [libbpf](./deps/libbpf/) shared library for running which gets compiled on your system the
@@ -105,11 +105,11 @@ export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
 
 run from inside the root directory of project.
 
-The command format is this.
+The command is run with the following parameters.
 
 `xdp_geneve_user -f GENEVE-FLAGS -v VLAN-ID -p SOURCE_PORT -c CAPTURE_INTERFACE -i IFACE_ID_OF_VETH_NODE1_ROOTNS -s IP_ADDRESS_OF_VETH_INSIDE_NODE1_NS -d IP_OF_OTHER_NODE_ETH0 -e VETH_MAC_INSIDE_NS -t MAC_OF_OTHER_NODE_ETH0 -q VETH_MAC_OF_NODE2_ROOT_NS -o ADD`
 
-It will look like this, 
+For instance, run
 
 ```
 $ ./build/xdp_geneve_user -f 0 -v 1 -p 51234 -c 14 -i 13 -s 10.200.1.100 -d 10.20.20.2 -e 3a:f1:23:63:d3:c6 -t b8:ce:f6:27:93:39 -q d6:75:d1:42:61:5c -o ADD
