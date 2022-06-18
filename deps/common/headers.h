@@ -53,9 +53,9 @@ bpf_trace_printk(____fmt, sizeof(____fmt), \
 #endif
 
 typedef struct tnl_inf{
-	__u16 iface;
-	__be64 vlid;
-        __u16 flags;
+    __u16 iface;
+	 __be64 vlid;
+    __u16 flags;
 	__u16 s_port;
 	__be32 d_addr;
 	__be32 s_addr;

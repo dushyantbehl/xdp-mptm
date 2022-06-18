@@ -55,8 +55,8 @@ $ bpftool prog show
 Attach to the interfaces ingress
 
 ```
-$ bpftool net attach xdp id 1236 dev v-eth1 overwrite
-$ bpftool net attach xdp id 1241 dev geneve0 overwrite
+$ bpftool net attach xdp id 114 dev veth-node1 overwrite
+$ bpftool net attach xdp id 110 dev geneve0 overwrite
 ```
 
 ## Programming the maps
@@ -112,19 +112,19 @@ The command format is this.
 It will look like this, 
 
 ```
-$ ./build/xdp_geneve_user -f 0 -v 152 -p 51234 -c 15 -i 18 -s 10.200.1.2 -d 10.10.10.2 -e c6:0e:4b:59:85:dd -t b8:ce:f6:27:93:38 -q 5e:81:0b:8b:15:46 -o ADD
+$ ./build/xdp_geneve_user -f 0 -v 1 -p 51234 -c 14 -i 13 -s 10.200.1.100 -d 10.20.20.2 -e 3a:f1:23:63:d3:c6 -t b8:ce:f6:27:93:39 -q d6:75:d1:42:61:5c -o ADD
 opt: f arg: 0 
-opt: v arg: 152 
+opt: v arg: 1 
 opt: p arg: 51234 
-opt: c arg: 15 
-opt: i arg: 18 
-opt: s arg: 10.200.1.2 
-opt: d arg: 10.10.10.2 
-opt: e arg: c6:0e:4b:59:85:dd 
-opt: t arg: b8:ce:f6:27:93:38 
-opt: q arg: 5e:81:0b:8b:15:46 
+opt: c arg: 14 
+opt: i arg: 13 
+opt: s arg: 10.200.1.100 
+opt: d arg: 10.20.20.2 
+opt: e arg: 3a:f1:23:63:d3:c6 
+opt: t arg: b8:ce:f6:27:93:39 
+opt: q arg: d6:75:d1:42:61:5c 
 opt: o arg: ADD 
-Using map dir: /sys/fs/bpf, iface 18 
+Using map dir: /sys/fs/bpf, iface 13 
 operation is add, adding tunnel iface entry
 ```
 
@@ -176,7 +176,7 @@ Found 1 element
 ## Show packets coming on xdp interface
 
 ```
-$ xdpdump -i v-eth1 -x --rx-capture entry,exit
+$ xdpdump -i veth-node1 -x --rx-capture entry,exit
 ```
 
 ## Generating Traffic:

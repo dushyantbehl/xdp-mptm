@@ -48,17 +48,19 @@ int mptm_xdp_geneve_push(struct xdp_md *ctx) {
       goto out;
     }
 
-    /*if(tn != NULL){
+  /*
+    if (tn != NULL) {
       //check if map entry is actually 
       bpf_debug(" if:  %d %d %d \n",tn->iface,tn->vlid,tn->flags);
       bpf_debug(" inner_d_mac:  %x %x %x  \n",tn->inner_d_mac[0],tn->inner_d_mac[1],tn->inner_d_mac[2]);
       bpf_debug(" inner_d_mac:  %x %x %x  \n",tn->inner_d_mac[3],tn->inner_d_mac[4],tn->inner_d_mac[5]);
-    }*/
+    }
+  */
 
-//  __builtin_memcpy(&tn, lookup(ctx->ingress_ifindex), sizeof(tunnel_info));
+    //__builtin_memcpy(&tn, lookup(ctx->ingress_ifindex), sizeof(tunnel_info));
     geneve_tag_push(ctx, eth, tn);
-    //IRL: Commented for debugging
-    //action = bpf_redirect(tn->iface, tn->flags);
+
+    action = bpf_redirect(tn->iface, tn->flags);
  out:
     //bpf_debug("a: %d t: %d\n",action, nh_type);
     return xdp_stats_record_action(ctx, action);

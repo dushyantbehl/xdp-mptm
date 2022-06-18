@@ -23,6 +23,8 @@ int  xdp_prog_redirect(struct xdp_md *ctx) {
       return XDP_PASS;
     }
 
+    bpf_debug("redirecting packet from  %d -> %d\n", key, *val);
+
     return bpf_redirect(*val, flags);
 }
 
