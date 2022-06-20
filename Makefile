@@ -2,14 +2,17 @@
 
 DEPS	     := ./deps
 
-XDP_TARGETS  := xdp_geneve xdp_redirect
-USER_TARGETS := $(addsuffix _user, $(XDP_TARGETS))
+SRC_DIR ?= src
+USER_SRC_DIR ?= ${SRC_DIR}/user
+KERNEL_SRC_DIR ?= ${SRC_DIR}/kernel
+
+XDP_PROGS    := xdp_geneve xdp_redirect
+XDP_TARGETS  := ${XDP_PROGS:=.o}
+USER_TARGETS := ${XDP_PROGS:=_user}
 USER_LIBS    := -lbpf -lm
 
-XDP_C    := $(addsuffix .c, $(addprefix src/kernel/,$(XDP_TARGETS)))
-XDP_OBJ  := ${XDP_C:.c=.o}
-USER_C   := $(addsuffix .c, $(addprefix src/user/,$(USER_TARGETS))) 
-USER_OBJ := ${USER_C:.c=.o}
+$(info XDP_TARGETS is [${XDP_TARGETS}])
+$(info USER_TARGETS is [${USER_TARGETS}])
 
 LIBBPF_DIR  = ${DEPS}/libbpf/src
 COMMON_DIR  = ${DEPS}/common

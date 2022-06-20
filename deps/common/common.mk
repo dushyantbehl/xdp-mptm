@@ -20,6 +20,9 @@ COMMON_DIR ?= ../common/
 HEADERS_DIR ?= ../headers/
 LIBBPF_DIR ?= ../libbpf/src/
 BIN ?= ./build
+SRC_DIR ?= src
+USER_SRC_DIR ?= ${SRC_DIR}/user
+KERNEL_SRC_DIR ?= ${SRC_DIR}/kernel
 
 COPY_LOADER ?=
 LOADER_DIR ?= $(COMMON_DIR)/../basic-solutions
@@ -46,7 +49,7 @@ BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/
 #LIBS = -l:libbpf.a -lelf $(USER_LIBS)
 LIBS = -lelf $(USER_LIBS)
 
-all: llvm-check create-dirs $(USER_OBJ) $(XDP_OBJ) $(COPY_LOADER) $(COPY_STATS)
+all: llvm-check create-dirs $(USER_TARGETS) $(XDP_TARGETS) $(COPY_LOADER) $(COPY_STATS)
 
 .PHONY: clean $(CLANG) $(LLC)
 
@@ -106,11 +109,11 @@ $(COMMON_H): %.h: %.c
 $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
-$(USER_OBJ): %.o: %.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o ${BIN}/$(basename $(notdir $@)) $(COMMON_OBJS) \
-	 $< $(LIBS)
+$(USER_TARGETS): %: %.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
+	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
+	 ${USER_SRC_DIR}/$< $(LIBS)
 
-$(XDP_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
+$(XDP_TARGETS): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
@@ -120,6 +123,6 @@ $(XDP_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJEC
 	    -Wno-pointer-sign \
 	    -Wno-compare-distinct-pointer-types \
 	    -Werror \
-	    -O2 -emit-llvm -c -g -o ${BIN}/$(notdir ${@:.o=.ll}) $<
-	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$(basename $(notdir $@)) ${BIN}/$(notdir ${@:.o=.ll})
+	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} ${KERNEL_SRC_DIR}/$<
+	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$@ ${BIN}/${@:.o=.ll}
 
