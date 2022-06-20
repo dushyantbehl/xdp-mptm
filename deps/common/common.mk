@@ -109,11 +109,11 @@ $(COMMON_H): %.h: %.c
 $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
-$(USER_TARGETS): %: %.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
+$(USER_TARGETS): %: ${USER_SRC_DIR}/%.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
-	 ${USER_SRC_DIR}/$< $(LIBS)
+	 $< $(LIBS)
 
-$(XDP_TARGETS): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
+$(XDP_TARGETS): %.o: ${KERNEL_SRC_DIR}/%.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
@@ -123,6 +123,6 @@ $(XDP_TARGETS): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(O
 	    -Wno-pointer-sign \
 	    -Wno-compare-distinct-pointer-types \
 	    -Werror \
-	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} ${KERNEL_SRC_DIR}/$<
+	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} $<
 	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$@ ${BIN}/${@:.o=.ll}
 
