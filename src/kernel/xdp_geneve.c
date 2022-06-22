@@ -59,8 +59,6 @@ int mptm_xdp_geneve_push(struct xdp_md *ctx) {
       bpf_debug(" eth_iface:%d v:%d f:%d \n",tn->iface,tn->vlid,tn->flags);
       bpf_debug(" inner_d_mac: %x:%x:%x:%x:%x:%x\n",tn->inner_d_mac[0],tn->inner_d_mac[1],tn->inner_d_mac[2],
                                                     tn->inner_d_mac[3],tn->inner_d_mac[4],tn->inner_d_mac[5]);
-      bpf_debug(" outer_d_mac: %x:%x:%x:%x:%x:%x\n",tn->outer_d_mac[0],tn->outer_d_mac[1],tn->outer_d_mac[2],
-                                                    tn->outer_d_mac[3],tn->outer_d_mac[4],tn->outer_d_mac[5]);
     }
 
     //__builtin_memcpy(&tn, lookup(ctx->ingress_ifindex), sizeof(tunnel_info));
