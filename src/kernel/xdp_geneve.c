@@ -56,9 +56,9 @@ int mptm_xdp_geneve_push(struct xdp_md *ctx) {
     debug = tn->debug;
     if (debug) {
       // debug print the contents of map entry
-      bpf_debug(" eth_iface:%d v:%d f:%d \n",tn->iface,tn->vlid,tn->flags);
+      bpf_debug(" eth_iface:%d v:%d f:%d \n", tn->iface, tn->vlid, tn->flags);
       unsigned short *inner_mac = (unsigned short *)tn->inner_d_mac;
-      u_int64_t mac = inner_mac[0] + (inner_mac[1]<<16) + (inner_mac[3]<<32)
+      unsigned long mac = inner_mac[0] + (inner_mac[1]<<16) + (inner_mac[3]<<32)
       bpf_debug(" inner_d_mac: %x\n", mac);
     }
 
