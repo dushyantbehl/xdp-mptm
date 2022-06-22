@@ -31,6 +31,7 @@ char d_addr[16];
 char s_mac[18];
 char outer_d_mac[18];
 char inner_d_mac[18];
+u_int8_t output = 0;
 
 void  print_usage() {
   printf("[USAGE]: v:f:p:i:c:s:d:e:t:o:q\n");
@@ -51,6 +52,7 @@ static const struct option long_options[] = {
         {"d_ip_addr",   required_argument, NULL, 'd'}, //"Destination IP addr of <redirect-dev>", "<ip>", true},
         {"d_mac",       required_argument, NULL, 't'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
         {"inner_d_mac", required_argument, NULL, 'q'}, //"Inner Destination MAC address", "<mac>", true},
+        {"output",      required_argument, NULL, 'o'},
         {0, 0, NULL, 0}
 };
 
@@ -58,7 +60,7 @@ int parse_params(int argc, char *argv[]) {
     int opt = 0;
     int long_index = 0;
 
-    while( (opt = getopt_long(argc, argv, "v:f:p:i:c:s:d:e:t:a:q:", 
+    while( (opt = getopt_long(argc, argv, "v:f:p:i:c:s:d:e:t:a:q:o:", 
                                  long_options, &long_index )) != -1 ) {
       printf("opt: %c arg: %s \n", opt, optarg);
       switch (opt) {
@@ -91,6 +93,8 @@ int parse_params(int argc, char *argv[]) {
                 fprintf(stderr, "INVALID value for option -o %s\n", optarg);
                 return -1;
             }
+            break;
+        case 'o' : output = atoi(optarg);
             break;
         default:
             fprintf(stderr, "INVALID parameter supplied %c\n", opt);
@@ -150,6 +154,9 @@ tunnel_info* create_tun_info(char* s_mac, char* outer_d_mac, char* inner_d_mac,
         fprintf(stderr, "s_addr value is incorrect\n");
         return NULL;
     }
+
+    loc->debug = output;
+
      return loc;
 }
 

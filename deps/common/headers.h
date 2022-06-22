@@ -62,7 +62,7 @@ typedef struct tnl_inf{
 	__u8 inner_d_mac[6];
 	__u8 s_mac[6] ;
 	__u8 d_mac[6];
-
+	__u8 debug;
 } __attribute__((packed)) tunnel_info;
 
 struct geneve_opt {

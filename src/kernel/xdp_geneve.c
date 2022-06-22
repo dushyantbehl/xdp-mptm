@@ -26,43 +26,48 @@ struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
 
 SEC("mptm_xdp_push")
 int mptm_xdp_geneve_push(struct xdp_md *ctx) {
-    void *data_end = (void *)((long)ctx->data_end);
-    void *data = (void *)((long)ctx->data);
+    int action = XDP_PASS;  //default action
+    struct hdr_cursor nh;
+    tunnel_info* tn;
+    __u32 key;
+    __u8 debug;
 
     /* These keep track of the next header type and iterator pointer */
-    struct hdr_cursor nh;
-    nh.pos = data;
-    int action = XDP_PASS;
-
     struct ethhdr *eth;
-    int nh_type = parse_ethhdr(&nh, data_end, &eth);
+    int nh_type;
+
+    void *data = (void *)((long)ctx->data);
+    void *data_end = (void *)((long)ctx->data_end);
+
+    nh.pos = data;
+    nh_type = parse_ethhdr(&nh, data_end, &eth);
     if (nh_type == -1)
       goto out;
     if (eth->h_proto == bpf_htons(ETH_P_ARP))
       goto out;
-    tunnel_info* tn;
-    __u32 key = ctx->ingress_ifindex;
+
+    key = ctx->ingress_ifindex;
     tn = bpf_map_lookup_elem(&mptm_tunnel_iface_map, &key);
-    if(tn == NULL){
+    if(tn == NULL) {
       bpf_debug("[ERR] map entry missing for iface %d\n", key);
       goto out;
     }
 
-  /*
-    if (tn != NULL) {
-      //check if map entry is actually 
-      bpf_debug(" if:  %d %d %d \n",tn->iface,tn->vlid,tn->flags);
-      bpf_debug(" inner_d_mac:  %x %x %x  \n",tn->inner_d_mac[0],tn->inner_d_mac[1],tn->inner_d_mac[2]);
-      bpf_debug(" inner_d_mac:  %x %x %x  \n",tn->inner_d_mac[3],tn->inner_d_mac[4],tn->inner_d_mac[5]);
+    debug = tn->debug;
+    if (debug) {
+      // debug print the contents of map entry
+      bpf_debug(" eth_iface:%d v:%d f:%d \n",tn->iface,tn->vlid,tn->flags);
+      bpf_debug(" inner_d_mac: %x:%x:%x:%x:%x:%x\n",tn->inner_d_mac[0],tn->inner_d_mac[1],tn->inner_d_mac[2],
+                                                    tn->inner_d_mac[3],tn->inner_d_mac[4],tn->inner_d_mac[5]);
+      bpf_debug(" outer_d_mac: %x:%x:%x:%x:%x:%x\n",tn->outer_d_mac[0],tn->outer_d_mac[1],tn->outer_d_mac[2],
+                                                    tn->outer_d_mac[3],tn->outer_d_mac[4],tn->outer_d_mac[5]);
     }
-  */
 
     //__builtin_memcpy(&tn, lookup(ctx->ingress_ifindex), sizeof(tunnel_info));
     geneve_tag_push(ctx, eth, tn);
-
     action = bpf_redirect(tn->iface, tn->flags);
- out:
-    //bpf_debug("a: %d t: %d\n",action, nh_type);
+
+  out:
     return xdp_stats_record_action(ctx, action);
 }
 
