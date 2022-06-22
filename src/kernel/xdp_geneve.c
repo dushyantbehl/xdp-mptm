@@ -57,9 +57,8 @@ int mptm_xdp_geneve_push(struct xdp_md *ctx) {
     if (debug) {
       // debug print the contents of map entry
       bpf_debug(" eth_iface:%d v:%d f:%d \n", tn->iface, tn->vlid, tn->flags);
-      unsigned short *inner_mac = (unsigned short *)tn->inner_d_mac;
-      unsigned long mac = inner_mac[0] + (inner_mac[1]<<16) + (inner_mac[3]<<32)
-      bpf_debug(" inner_d_mac: %x\n", mac);
+      bpf_debug(" inner_d_mac :  %x %x %x \n", tn->inner_d_mac[0], tn->inner_d_mac[1], tn->inner_d_mac[2]);
+      bpf_debug(" inner_d_mac :  %x %x %x \n", tn->inner_d_mac[3], tn->inner_d_mac[4], tn->inner_d_mac[5]);
     }
 
     //__builtin_memcpy(&tn, lookup(ctx->ingress_ifindex), sizeof(tunnel_info));
