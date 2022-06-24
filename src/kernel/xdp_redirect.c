@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
-#include <common/headers.h>
+
+/* only for bpf_debug function */
+#include <kernel/lib/protocol-headers.h>
 
 #define MAX_ENTRIES 30
 

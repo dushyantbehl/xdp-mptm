@@ -15,6 +15,9 @@ LLC ?= llc
 CLANG ?= clang
 CC ?= gcc
 
+CCFLAGS ?= -Wall -Werror
+BPF_CCFLAGS ?= $(CCFLAGS) -Wno-unused-value -Wno-pointer-sign -Wno-compare-distinct-pointer-types
+
 # Expect this is defined by including Makefile, but define if not
 COMMON_DIR ?= ../common/
 HEADERS_DIR ?= ../headers/
@@ -42,10 +45,11 @@ KERN_USER_H ?= $(wildcard common_kern_user.h)
 
 CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -g
 CFLAGS += -I${HEADERS_DIR}/ -I${DEPS}/
+CFLAGS += -I$(SRC_DIR)/
 
 LDFLAGS ?= -L$(LIBBPF_DIR)
 
-BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/
+BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/ -I$(SRC_DIR)/
 LIBS = -l:libbpf.a -lelf -lz $(USER_LIBS)
 
 all: llvm-check create-dirs $(USER_TARGETS) $(XDP_TARGETS) $(COPY_LOADER) $(COPY_STATS)
@@ -109,19 +113,15 @@ $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
 $(USER_TARGETS): %: ${USER_SRC_DIR}/%.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
+	$(CC) $(CCFLAGS) $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
 	 $< $(LIBS)
 
 $(XDP_TARGETS): %.o: ${KERNEL_SRC_DIR}/%.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
-	    $(BPF_CFLAGS) \
-	    -Wall \
-	    -Wno-unused-value \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
+		$(BPF_CFLAGS) $(BPF_CCFLAGS) \
 	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} $<
 	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$@ ${BIN}/${@:.o=.ll}
+
 
