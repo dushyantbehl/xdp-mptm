@@ -15,6 +15,9 @@ LLC ?= llc
 CLANG ?= clang
 CC ?= gcc
 
+CCFLAGS ?= -Wall -Werror
+BPF_CCFLAGS ?= $(CCFLAGS) -Wno-unused-value -Wno-pointer-sign -Wno-compare-distinct-pointer-types
+
 # Expect this is defined by including Makefile, but define if not
 COMMON_DIR ?= ../common/
 HEADERS_DIR ?= ../headers/
@@ -110,19 +113,14 @@ $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
 $(USER_TARGETS): %: ${USER_SRC_DIR}/%.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
+	$(CC) $(CCFLAGS) $(CFLAGS) $(LDFLAGS) -o ${BIN}/$@ $(COMMON_OBJS) \
 	 $< $(LIBS)
 
 $(XDP_TARGETS): %.o: ${KERNEL_SRC_DIR}/%.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(OBJECT_LIBBPF)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
-	    $(BPF_CFLAGS) \
-	    -Wall \
-	    -Wno-unused-value \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
+		$(BPF_CFLAGS) $(BPF_CCFLAGS) \
 	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} $<
 	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$@ ${BIN}/${@:.o=.ll}
 
