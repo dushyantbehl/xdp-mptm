@@ -16,192 +16,129 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-#include "headers.h"
-#define DEFAULT_TTL 64
-#define GEN_DSTPORT 0xc117
-
-/*
-#ifndef bpf_debug
-#define bpf_debug(fmt, ...) \
-({ \
-const char ____fmt[] = fmt; \
-bpf_trace_printk(____fmt, sizeof(____fmt), \
-##__VA_ARGS__); \
-})
-#else
-#define bpf_debug(fmt, ...) { } while (0)
-#endif
-*/
-
-#define __ALWAYS_INLINE__ __attribute__((__always_inline__))
-
-
-__ALWAYS_INLINE__
-static inline void set_dst_mac(void *data, unsigned char *dst_mac)
+/* Pops the outermost VLAN tag off the packet. Returns the popped VLAN ID on
+ * success or negative errno on failure.
+ */
+static __always_inline int vlan_tag_pop(struct xdp_md *ctx, struct ethhdr *eth)
 {
-	unsigned short *p = data;
-	unsigned short *dst = (unsigned short *)dst_mac;
+	void *data_end = (void *)(long)ctx->data_end;
+	struct ethhdr eth_cpy;
+	struct vlan_hdr *vlh;
+	__be16 h_proto;
+	int vlid;
 
-	p[0] = dst[0];
-	p[1] = dst[1];
-	p[2] = dst[2];
+	if (!proto_is_vlan(eth->h_proto))
+		return -1;
+
+	/* Careful with the parenthesis here */
+	vlh = (void *)(eth + 1);
+
+	/* Still need to do bounds checking */
+	if (vlh + 1 > data_end)
+		return -1;
+
+	/* Save vlan ID for returning, h_proto for updating Ethernet header */
+	vlid = bpf_ntohs(vlh->h_vlan_TCI);
+	h_proto = vlh->h_vlan_encapsulated_proto;
+
+	/* Make a copy of the outer Ethernet header before we cut it off */
+	__builtin_memcpy(&eth_cpy, eth, sizeof(eth_cpy));
+
+	/* Actually adjust the head pointer */
+	if (bpf_xdp_adjust_head(ctx, (int)sizeof(*vlh)))
+		return -1;
+
+	/* Need to re-evaluate data *and* data_end and do new bounds checking
+	 * after adjusting head
+	 */
+	eth = (void *)(long)ctx->data;
+	data_end = (void *)(long)ctx->data_end;
+	if (eth + 1 > data_end)
+		return -1;
+
+	/* Copy back the old Ethernet header and update the proto type */
+	__builtin_memcpy(eth, &eth_cpy, sizeof(*eth));
+	eth->h_proto = h_proto;
+
+	return vlid;
 }
 
-__ALWAYS_INLINE__
-static inline void set_src_mac(void *data, unsigned char *src_mac)
-{
-	unsigned short *p = data;
-	unsigned short *src = (unsigned short *)src_mac;
-
-	p[3] = src[0];
-	p[4] = src[1];
-	p[5] = src[2];
-}
-
-__ALWAYS_INLINE__
-static inline __u16 csum_fold_helper(__u64 csum)
-{
-	int i;
-#pragma unroll
-	for (i = 0; i < 4; i++) {
-		if (csum >> 16)
-			csum = (csum & 0xffff) + (csum >> 16);
-	}
-	return ~csum;
-}
-
-__ALWAYS_INLINE__
-static inline void ipv4_csum_inline(void *iph, __u64 *csum)
-{
-	__u16 *next_iph_u16 = (__u16 *)iph;
-#pragma clang loop unroll(full)
-	for (int i = 0; i<sizeof(struct iphdr)>> 1; i++) {
-		*csum += *next_iph_u16++;
-	}
-	*csum = csum_fold_helper(*csum);
-}
-
-
-/* Pushes a new GENEVE header after the Ethernet header. Returns 0 on success,
+/* Pushes a new VLAN tag after the Ethernet header. Returns 0 on success,
  * -1 on failure.
  */
-static __always_inline int geneve_tag_push(struct xdp_md *ctx,
-		struct ethhdr *eth, tunnel_info* tn)
+static __always_inline int vlan_tag_push(struct xdp_md *ctx,
+		struct ethhdr *eth, int vlid)
 {
+	void *data_end = (void *)(long)ctx->data_end;
+	struct ethhdr eth_cpy;
+	struct vlan_hdr *vlh;
 
-	int gnv_hdr_size = sizeof(struct genevehdr);
-	int udp_hdr_size = sizeof(struct udphdr);
-	int ip_hdr_size = sizeof(struct iphdr);
-	int eth_hdr_size = sizeof(struct ethhdr);
+	/* First copy the original Ethernet header */
+	__builtin_memcpy(&eth_cpy, eth, sizeof(eth_cpy));
 
- 	void *data = (void *)(long)ctx->data;
-        void *data_end = (void *)(long)ctx->data_end;
-	int old_size = (int)(data_end - data);
+	/* Then add space in front of the packet */
+	if (bpf_xdp_adjust_head(ctx, 0 - (int)sizeof(*vlh)))
+		return -1;
 
-	struct ethhdr *eth_inner_hdr = (struct ethhdr *)data;
-	if (eth_inner_hdr + 1 > data_end ){
-		bpf_debug("[Agent: ] ABORTED: Bad ETH header offset \n");
-		return XDP_ABORTED;
-	}
-	//TODO: IRL Read from arp map table
-	//	unsigned char inner_d_mac[]={0xc2,0x04,0xf3,0xc8,0xcf,0x7f};
-	//unsigned char inner_d_mac[]={0x66,0x02,0xf4,0x4e,0x79,0x91};
-        set_dst_mac(data, tn->inner_d_mac);
+	/* Need to re-evaluate data_end and data after head adjustment, and
+	 * bounds check, even though we know there is enough space (as we
+	 * increased it).
+	 */
+	data_end = (void *)(long)ctx->data_end;
+	eth = (void *)(long)ctx->data;
 
-	int outer_hdr_size =
-		gnv_hdr_size + udp_hdr_size + ip_hdr_size + eth_hdr_size;
-	long ret = bpf_xdp_adjust_head(ctx, (0-outer_hdr_size));
-       	if (ret != 0l) {
-		bpf_debug("[Agent:] DROP (BUG): Failure adjusting packet header!\n");
-		return XDP_DROP;
-	}
-	data = (void *)(long)ctx->data;
-        data_end = (void *)(long)ctx->data_end;
+	if (eth + 1 > data_end)
+		return -1;
 
-	struct ethhdr *ethcpy;
-	ethcpy = data;
+	/* Copy back Ethernet header in the right place, populate VLAN tag with
+	 * ID and proto, and set outer Ethernet header to VLAN type.
+	 */
+	__builtin_memcpy(eth, &eth_cpy, sizeof(*eth));
 
-		
-	if (ethcpy + 1 > data_end ){
-		bpf_debug("[Agent: ] ABORTED: Bad ETH header offset \n");
-		return XDP_ABORTED;
-	}
-	
-	struct iphdr *ip = (struct iphdr *)(ethcpy + 1);
-	if (ip + 1 > data_end){
-	 	bpf_debug("[Agent: ] ABORTED: Bad ip header offset ip: %x data_end:%x \n",ip+1,data_end);
-	 	return XDP_ABORTED;
-	}	
-	struct udphdr *udp = (struct udphdr*)(ip + 1);
-	if (udp + 1 > data_end){
-	 	bpf_debug("[Agent: ] ABORTED: Bad udp header offset \n");
-	 	return XDP_ABORTED;
-	}	
-	struct genevehdr *geneve = (struct genevehdr*)(udp +1);
-	if (geneve + 1 > data_end){
-	 	bpf_debug("[Agent: ] ABORTED: Bad GENEVE header offset \n");
-	 	return XDP_ABORTED;
-	}	
-	
+	vlh = (void *)(eth + 1);
 
-	//TODO: Attach options
-	//pkt->rts_opt = (void *)&pkt->geneve->options[0];
+	if (vlh + 1 > data_end)
+		return -1;
 
-	
-	// Populate the outer header fields 
-	ethcpy->h_proto = bpf_htons(ETH_P_IP);
-	set_dst_mac(data, tn->d_mac);
-	set_src_mac(data, tn->s_mac);
-	
-	int outer_ip_payload = gnv_hdr_size + udp_hdr_size + ip_hdr_size + old_size;
-	int outer_udp_payload = gnv_hdr_size + udp_hdr_size + old_size;
+	vlh->h_vlan_TCI = bpf_htons(vlid);
+	vlh->h_vlan_encapsulated_proto = eth->h_proto;
 
-
-	ip->version = 4;
-	ip->ihl = ip_hdr_size >> 2;
-	ip->frag_off = 0;
-	ip->protocol = IPPROTO_UDP;
-	ip->check = 0;
-	ip->tos = 0;
-	ip->tot_len = bpf_htons(outer_ip_payload);
- 
-	ip->daddr = bpf_htonl(tn->d_addr);
-	ip->saddr = bpf_htonl(tn->s_addr);
-	ip->ttl = DEFAULT_TTL;
-    	
-	__u64  c_sum = 0;
-	ipv4_csum_inline(ip, &c_sum);
-	ip->check = c_sum;
-
-	//TODO: Put right checksum.
-	//IRL:For nowMake check 0
-	udp->check = 0;
-	udp->source = bpf_htons(tn->s_port); // TODO: a hash value based on inner IP packet
-	udp->dest = GEN_DSTPORT;
-	udp->len = bpf_htons(outer_udp_payload);
-
-	__builtin_memset(geneve, 0, gnv_hdr_size);
-
-	//TODO: Need to support geneve options
-	
-	//pkt->geneve->opt_len = gnv_opt_size / 4;
-	geneve->opt_len = 0 / 4;
-	geneve->ver = 0;
-	geneve->rsvd1 = 0;
-	geneve->rsvd2 = 0;
-	geneve->oam = 0;
-	geneve->critical = 0;
-	geneve->proto_type = bpf_htons(ETH_P_TEB);
-
-		
-	//TODO: IRL make vni paramater
-	//trn_tunnel_id_to_vni(tn->vlid, pkt->geneve->vni);
-
-	geneve->vni[0] = (__u8)(tn->vlid >> 16);
-	geneve->vni[1] = (__u8)(tn->vlid >> 8);
-	geneve->vni[2] = (__u8)tn->vlid;
-	return XDP_PASS;
+	eth->h_proto = bpf_htons(ETH_P_8021Q);
+	return 0;
 }
 
+/*
+ * Swaps destination and source MAC addresses inside an Ethernet header
+ */
+static __always_inline void swap_src_dst_mac(struct ethhdr *eth)
+{
+	__u8 h_tmp[ETH_ALEN];
+
+	__builtin_memcpy(h_tmp, eth->h_source, ETH_ALEN);
+	__builtin_memcpy(eth->h_source, eth->h_dest, ETH_ALEN);
+	__builtin_memcpy(eth->h_dest, h_tmp, ETH_ALEN);
+}
+
+/*
+ * Swaps destination and source IPv6 addresses inside an IPv6 header
+ */
+static __always_inline void swap_src_dst_ipv6(struct ipv6hdr *ipv6)
+{
+	struct in6_addr tmp = ipv6->saddr;
+
+	ipv6->saddr = ipv6->daddr;
+	ipv6->daddr = tmp;
+}
+
+/*
+ * Swaps destination and source IPv4 addresses inside an IPv4 header
+ */
+static __always_inline void swap_src_dst_ipv4(struct iphdr *iphdr)
+{
+	__be32 tmp = iphdr->saddr;
+
+	iphdr->saddr = iphdr->daddr;
+	iphdr->daddr = tmp;
+}
 
 #endif /* __REWRITE_HELPERS_H */

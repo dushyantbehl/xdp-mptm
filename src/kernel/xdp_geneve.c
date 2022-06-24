@@ -10,7 +10,9 @@
 
 // The parsing helper functions from the packet01 lesson have moved here
 #include <common/parsing_helpers.h>
-#include <common/rewrite_helpers.h>
+
+#include <kernel/lib/protocol-headers.h>
+#include <kernel/lib/geneve.h>
 
 /* Defines xdp_stats_map */
 #include <common/xdp_stats_kern_user.h>

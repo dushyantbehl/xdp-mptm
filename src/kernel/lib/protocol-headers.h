@@ -30,23 +30,22 @@
 #include <linux/tcp.h>
 #include <stddef.h>
 
-//#include "rewrite_helpers.h"
-
 #ifndef __inline
 #define __inline inline __attribute__((always_inline))
 #endif
 
+#ifndef bpf_debug
 #define bpf_debug(fmt, ...) \
 ({ \
 const char ____fmt[] = fmt; \
 bpf_trace_printk(____fmt, sizeof(____fmt), \
 ##__VA_ARGS__); \
 })
+#else
+#define bpf_debug(fmt, ...) { } while (0)
+#endif
 
-
-//#else
-//#define bpf_debug(fmt, ...) { } while (0)
-//#endif
+#define __ALWAYS_INLINE__ __attribute__((__always_inline__))
 
 #ifndef __ALWAYS_INLINE__
 #define __ALWAYS_INLINE__ __attribute__((__always_inline__))
@@ -85,7 +84,7 @@ struct genevehdr {
 	__be16 proto_type;
 	__u8 vni[3];
 	__u8 rsvd2;
-  //struct geneve_opt options[];
+    //struct geneve_opt options[];
 };
 
 struct ipv4_tuple_t {

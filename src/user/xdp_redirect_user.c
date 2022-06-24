@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "bpf-user-helpers.h"
+#include <user/lib/bpf-user-helpers.h>
 
 #define REDIRECT_MAP       "redirect_map"
 

@@ -16,7 +16,14 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "bpf-user-helpers.h"
+/* custom ones from xdp examples */
+#include <common/common_user_bpf_xdp.h>
+#include <common/common_params.h>
+#include <common/xdp_stats_kern_user.h>
+
+#include <kernel/lib/protocol-headers.h>
+#include <user/lib/bpf-user-helpers.h>
+
 
 #define TUNNEL_IFACE_MAP   "tunnel_map_iface"
 
@@ -35,8 +42,8 @@ u_int8_t output = 0;
 
 void  print_usage() {
   printf("[USAGE]: v:f:p:i:c:s:d:e:t:o:q\n");
-  printf("v:vlanid f:flags p:source_port i:capture_iface_index(for egress say veth0)"
-         " c:redirect_iface_index(for egress say eth0) s:s_ipaddr d:d_ipdaddr e:s_mac"
+  printf("v:vlanid f:flags p:source_port c:capture_iface_index(for egress say veth0)"
+         " i:redirect_iface_index(for egress say eth0) s:s_ipaddr d:d_ipdaddr e:s_mac"
          " t:outer_d_mac q:inner_d_mac a:action [ADD/DEL]\n");
 }
 

@@ -10,13 +10,6 @@
 #include <linux/if_link.h> /* depend on kernel-headers installed */
 #include <linux/bpf.h>
 
-/* custom ones from xdp examples */
-#include <common/common_user_bpf_xdp.h>
-#include <common/common_params.h>
-#include <common/xdp_stats_kern_user.h>
-#include <common/headers.h>
-
-
 #define PIN_BASE_DIR "/sys/fs/bpf"
 #define MAP_ADD 0
 #define MAP_DELETE 1
