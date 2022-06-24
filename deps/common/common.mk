@@ -46,8 +46,7 @@ CFLAGS += -I${HEADERS_DIR}/ -I${DEPS}/
 LDFLAGS ?= -L$(LIBBPF_DIR)
 
 BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/
-#LIBS = -l:libbpf.a -lelf $(USER_LIBS)
-LIBS = -lelf $(USER_LIBS)
+LIBS = -l:libbpf.a -lelf -lz $(USER_LIBS)
 
 all: llvm-check create-dirs $(USER_TARGETS) $(XDP_TARGETS) $(COPY_LOADER) $(COPY_STATS)
 
