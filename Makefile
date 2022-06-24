@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
-
 DEPS	     := ./deps
 
 SRC_DIR ?= src
@@ -21,7 +20,6 @@ HEADERS_DIR = ${DEPS}/headers
 EXTRA_DEPS  += $(COMMON_DIR)/parsing_helpers.h
 
 include $(COMMON_DIR)/common.mk
-#COMMON_OBJS := $(COMMON_DIR)/common.o
 
 .PHONY: tags
 tags:
