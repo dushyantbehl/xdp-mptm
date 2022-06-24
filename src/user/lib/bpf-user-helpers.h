@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2->0 */
 
-/************************** BOILER PLATE COMMON TO USERS **********************/
+/* BOILER PLATE COMMON TO USERS */
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -9,6 +9,9 @@
 #include <linux/if_ether.h>
 #include <linux/if_link.h> /* depend on kernel-headers installed */
 #include <linux/bpf.h>
+
+#include <common/common_defines.h>
+#include <common/common_user_bpf_xdp.h>
 
 #define PIN_BASE_DIR "/sys/fs/bpf"
 #define MAP_ADD 0

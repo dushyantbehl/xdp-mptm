@@ -16,14 +16,11 @@
 #include <unistd.h>
 #include <time.h>
 
-/* custom ones from xdp examples */
-#include <common/common_user_bpf_xdp.h>
-#include <common/common_params.h>
-#include <common/xdp_stats_kern_user.h>
-
 #include <kernel/lib/protocol-headers.h>
 #include <user/lib/bpf-user-helpers.h>
 
+ /* custom ones from xdp examples */
+#include <common/xdp_stats_kern_user.h>
 
 #define TUNNEL_IFACE_MAP   "tunnel_map_iface"
 

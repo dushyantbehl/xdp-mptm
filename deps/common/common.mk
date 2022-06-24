@@ -42,10 +42,11 @@ KERN_USER_H ?= $(wildcard common_kern_user.h)
 
 CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -g
 CFLAGS += -I${HEADERS_DIR}/ -I${DEPS}/
+CFLAGS += -I$(SRC_DIR)/
 
 LDFLAGS ?= -L$(LIBBPF_DIR)
 
-BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/
+BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/ -I$(SRC_DIR)/
 LIBS = -l:libbpf.a -lelf -lz $(USER_LIBS)
 
 all: llvm-check create-dirs $(USER_TARGETS) $(XDP_TARGETS) $(COPY_LOADER) $(COPY_STATS)
@@ -124,4 +125,5 @@ $(XDP_TARGETS): %.o: ${KERNEL_SRC_DIR}/%.c  Makefile $(COMMON_MK) $(KERN_USER_H)
 	    -Werror \
 	    -O2 -emit-llvm -c -g -o ${BIN}/${@:.o=.ll} $<
 	$(LLC) -march=bpf -filetype=obj -o ${BIN}/$@ ${BIN}/${@:.o=.ll}
+
 
