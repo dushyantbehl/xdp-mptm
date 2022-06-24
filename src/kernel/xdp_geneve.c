@@ -8,7 +8,6 @@
 #include <bpf/bpf_endian.h>
 //#include <iproute2/bpf_elf.h>
 
-// The parsing helper functions from the packet01 lesson have moved here
 #include <common/parsing_helpers.h>
 
 #include <kernel/lib/protocol-headers.h>
