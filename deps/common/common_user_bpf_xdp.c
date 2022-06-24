@@ -16,7 +16,6 @@
 #define PATH_MAX	4096
 #endif
 
-#if 0
 int xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd)
 {
 	int err;
@@ -345,7 +344,7 @@ int check_map_fd_info(const struct bpf_map_info *info,
 
 	return 0;
 }
-#endif
+
 int open_bpf_map_file(const char *pin_dir,
 		      const char *mapname,
 		      struct bpf_map_info *info)
