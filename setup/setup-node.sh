@@ -38,7 +38,7 @@ function setup_host {
 	# Doesn't work on Xeons due to BIOS settings...need to fix.
 	# For Debian/Ubuntu systems:
 	# cpufreq-set -r -g performance
-T	# To watch the CPU governor in action, you can do this:
+	# To watch the CPU governor in action, you can do this:
 	#watch -n 1 grep MHz /proc/cpuinfo
 
 	# Enable IP-forwarding.
