@@ -87,7 +87,7 @@ typedef struct tunnel_info {
         struct geneve_info geneve;
         struct vxlan_info vxlan;
         struct vlan_info vlan;
-    } tnl_info;
+    } tnl_info __attribute__((aligned));
 } __attribute__((packed)) mptm_tunnel_info;
 
 struct geneve_opt {

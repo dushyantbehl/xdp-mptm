@@ -1,4 +1,5 @@
 build/
+*.pcap
 tags
 TAGS
 deps/libbpf/src/build/

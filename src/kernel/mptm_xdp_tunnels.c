@@ -8,7 +8,6 @@
 #include <bpf/bpf_endian.h>
 //#include <iproute2/bpf_elf.h>
 
-#include <common/redirect_helpers.h>
 #include <common/parsing_helpers.h>
 
 #include <kernel/lib/headers.h>
@@ -31,8 +30,8 @@ struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
 /* TODO: these functions have a lot of overlap
  * maybe move common stuff to a header
  */
-SEC("mptm_geneve_push")
-int mptm_geneve_push(struct xdp_md *ctx) {
+SEC("mptm_xdp_push")
+int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
     struct ethhdr *eth;
     mptm_tunnel_info* tn;
