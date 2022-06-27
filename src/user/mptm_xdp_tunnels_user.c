@@ -77,7 +77,7 @@ int verify_args(mptm_args *mptm) {
             // currently we don't check vlanid and flags as they can be zero
             if (mptm->capture_iface == 0 || // mptm->vlid == 0 || mptm->flags == 0 ||
                 mptm->redirect_iface == 0 || mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0' ||
-                mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac == '\0') {
+                mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac[0] == '\0') {
                 // if we need to add then we need all the other info to create
                 // tunnel structure.
                 fprintf(stderr, "operation is add but all argumnets are not provided\n");
@@ -160,9 +160,9 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     return verify_args(mptm);
 }
 
-tunnel_info* create_tun_info(mptm_args *mptm) {
+mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
 
-    mptm_tunnel_info *tn = (tunnel_info *)malloc(sizeof(mptm_tunnel_info));
+    mptm_tunnel_info *tn = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
 
     tn->debug = mptm->debug;
     tn->tunnel_type = mptm->tunnel;
@@ -170,14 +170,14 @@ tunnel_info* create_tun_info(mptm_args *mptm) {
     tn->redirect_if = mptm->redirect_iface;
     tn->flags = mptm->flags;
 
-    switch (mptm->tunnel)
-    {
-    case VLAN:
-        vlan_tunnel_info *vlan = (vlan_tunnel_info *)&tn->tnl_info.vlan;
+    switch (mptm->tunnel) {
+    case VLAN: {
+        struct vlan_info *vlan = (struct vlan_info *)(&tn->tnl_info.vlan);
         vlan->vlan_id = mptm->vlid;
-        break;
-    case GENEVE:
-        geneve_tunnel_info *geneve = (geneve_tunnel_info *)&tn->tnl_info.geneve;
+      }
+      break;
+    case GENEVE: {
+        struct geneve_info *geneve = (struct geneve_info *)(&tn->tnl_info.geneve);
         geneve->vlan_id = mptm->vlid;
         geneve->source_port = mptm->source_port;
         if (parse_mac(mptm->source_mac, geneve->source_mac) < 0) {
@@ -202,19 +202,20 @@ tunnel_info* create_tun_info(mptm_args *mptm) {
             fprintf(stderr, "source_addr value is incorrect\n");
             return NULL;
         }
-        break;
+      }
+      break;
     default:
         break;
     }
 
-     return loc;
+     return tn;
 }
 
 int main(int argc, char **argv) {
 
-    mptm_args *mptm_args = (mptm_args *)zalloc(sizeof(mptm_args));
+    mptm_args *mptm = (mptm_args *)malloc(sizeof(mptm_args));
 
-    if (parse_params(argc, argv, mptm_args) != 0) {
+    if (parse_params(argc, argv, mptm) != 0) {
         fprintf(stderr, "parsing params failed\n");
         print_usage();
         exit(EXIT_FAILURE);
@@ -227,14 +228,15 @@ int main(int argc, char **argv) {
         return EXIT_FAIL_BPF;
     }
 
-    tunnel_info *ti = NULL;
-    if (action == MAP_ADD) {
-        ti = create_tun_info(mptm_args);
+    mptm_tunnel_info *ti = NULL;
+    if (mptm->action == MAP_ADD) {
+        ti = create_tun_info(mptm);
         if(ti == NULL) {
             fprintf(stderr, "failed creating struct\n");
             return EXIT_FAIL_OPTION;
         }
     }
 
-    return update_map(tunnel_map_fd, action, &mptm_args->capture_iface, ti, 0, TUNNEL_IFACE_MAP);
+    return update_map(tunnel_map_fd, mptm->action, &mptm->capture_iface, ti, 0, TUNNEL_IFACE_MAP);
 }
+
