@@ -3,7 +3,7 @@
 #include <bpf/bpf_helpers.h>
 
 /* only for bpf_debug function */
-#include <kernel/lib/protocol-headers.h>
+#include <kernel/lib/headers.h>
 
 #define MAX_ENTRIES 30
 

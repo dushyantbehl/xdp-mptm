@@ -5,9 +5,9 @@ SRC_DIR ?= src
 USER_SRC_DIR ?= ${SRC_DIR}/user
 KERNEL_SRC_DIR ?= ${SRC_DIR}/kernel
 
-XDP_PROGS    := xdp_geneve xdp_redirect
-XDP_TARGETS  := ${XDP_PROGS:=.o}
-USER_TARGETS := ${XDP_PROGS:=_user}
+XDP_PROGS    := mptm_xdp_tunnels
+XDP_TARGETS  := #${XDP_PROGS:=.o}
+USER_TARGETS := #${XDP_PROGS:=_user}
 USER_LIBS    := -lbpf -lm
 
 $(info XDP_TARGETS is [${XDP_TARGETS}])
