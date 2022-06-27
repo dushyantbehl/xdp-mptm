@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#include <kernel/lib/protocol-headers.h>
+#include <kernel/lib/headers.h>
 #include <user/lib/bpf-user-helpers.h>
 
  /* custom ones from xdp examples */
@@ -24,81 +24,132 @@
 
 #define TUNNEL_IFACE_MAP   "tunnel_map_iface"
 
-int action;
-u_int32_t capture_iface = -1;
-u_int64_t vlid = -1;
-u_int16_t flags = -1;
-u_int16_t s_port = -1;
-u_int16_t eth_iface = -1;
-char s_addr[16];
-char d_addr[16];
-char s_mac[18];
-char outer_d_mac[18];
-char inner_d_mac[18];
-u_int8_t output = 0;
+typedef struct mptm_arguments {
+    int action;
+    u_int32_t capture_iface;
+    u_int64_t vlid;
+    u_int16_t flags;
+    u_int16_t source_port;
+    u_int16_t redirect_iface;
+    char source_addr[16];
+    char dest_addr[16];
+    char source_mac[18];
+    char outer_dest_mac[18];
+    char inner_dest_mac[18];
+    u_int8_t debug;
+    u_int8_t tunnel;
+    u_int8_t redirect;
+} mptm_args;
 
+// TODO: Update
 void  print_usage() {
-  printf("[USAGE]: v:f:p:i:c:s:d:e:t:o:q\n");
+  printf("[USAGE]: a:t:v:f:p:I:R:s:S:d:D:M:V:\n");
   printf("v:vlanid f:flags p:source_port c:capture_iface_index(for egress say veth0)"
          " i:redirect_iface_index(for egress say eth0) s:s_ipaddr d:d_ipdaddr e:s_mac"
          " t:outer_d_mac q:inner_d_mac a:action [ADD/DEL]\n");
 }
 
 static const struct option long_options[] = {
-        {"action",      required_argument, 0,    'a'},
-        {"vlid",        required_argument, 0,    'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
-        {"flags",       required_argument, 0,    'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
-        {"s_port",      required_argument, 0,    'p'}, //"Source Port of <connection>", "<port>", true},
-        {"iface",       required_argument, 0,    'c'}, //"Iface index capture <dev>", "<ifidx>", true},
-        {"eth_iface",   required_argument, 0,    'i'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
-        {"s_ip_addr",   required_argument, NULL, 's'}, //"Source IP address of <dev>", "<ip>", true},
-        {"s_mac",       required_argument, NULL, 'e'}, //"Source MAC addr of <dev>", "<mac>", true},
-        {"d_ip_addr",   required_argument, NULL, 'd'}, //"Destination IP addr of <redirect-dev>", "<ip>", true},
-        {"d_mac",       required_argument, NULL, 't'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
-        {"inner_d_mac", required_argument, NULL, 'q'}, //"Inner Destination MAC address", "<mac>", true},
-        {"output",      required_argument, NULL, 'o'},
+        {"action",         required_argument, 0,    'a'},
+        {"vlid",           required_argument, 0,    'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
+        {"flags",          required_argument, 0,    'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
+        {"source_port",    required_argument, 0,    'p'}, //"Source Port of <connection>", "<port>", true},
+        {"ingress_iface",  required_argument, 0,    'I'}, //"Iface index capture <dev>", "<ifidx>", true},
+        {"redirect",       required_argument, 0,    'r'}, // to redirect packet to redirect_iface or not
+        {"redirect_iface", required_argument, 0,    'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
+        {"source_ip",      required_argument, NULL, 's'}, //"Source IP address of <dev>", "<ip>", true},
+        {"source_mac",     required_argument, NULL, 'S'}, //"Source MAC addr of <dev>", "<mac>", true},
+        {"dest_ip",        required_argument, NULL, 'd'}, //"Destination IP addr of <redirect-dev>", "<ip>", true},
+        {"dest_mac",       required_argument, NULL, 'D'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
+        {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
+        {"verbose",        required_argument, NULL, 'V'},
+        {"tunnel",         required_argument, NULL, 't'},
         {0, 0, NULL, 0}
 };
 
-int parse_params(int argc, char *argv[]) {
+int verify_args(mptm_args *mptm) {
+    int action = mptm->action;
+
+    switch (mptm->tunnel)
+    {
+    case GENEVE:
+        if(action == MAP_ADD) {
+            // currently we don't check vlanid and flags as they can be zero
+            if (mptm->capture_iface == 0 || // mptm->vlid == 0 || mptm->flags == 0 ||
+                mptm->redirect_iface == 0 || mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0' ||
+                mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac == '\0') {
+                // if we need to add then we need all the other info to create
+                // tunnel structure.
+                fprintf(stderr, "operation is add but all argumnets are not provided\n");
+                return -1;
+            }
+            printf("All arguments verified\n");
+        } else if(mptm->capture_iface == 0) {
+            // for delete we only need iface.
+            fprintf(stderr, "operation is delete but key (-c) is not provided\n");
+            return 1;
+        }
+      break;
+    case VLAN:
+        if (action == MAP_ADD) {
+            // currently we don't check vlanid as it can be zero
+        } else if(mptm->capture_iface == 0) {
+            // for delete we only need iface.
+            fprintf(stderr, "operation is delete but key (-c) is not provided\n");
+            return 1;
+        }
+      break;
+    default:
+        fprintf(stderr, "Unknown type of tunnel\n");
+        return 1;
+    }
+    return 0;
+}
+
+int parse_params(int argc, char *argv[], mptm_args *mptm) {
     int opt = 0;
     int long_index = 0;
 
-    while( (opt = getopt_long(argc, argv, "v:f:p:i:c:s:d:e:t:a:q:o:", 
+    while( (opt = getopt_long(argc, argv, "a:t:v:f:p:I:R:s:S:d:D:M:V:", 
                                  long_options, &long_index )) != -1 ) {
       printf("opt: %c arg: %s \n", opt, optarg);
       switch (opt) {
-        case 'v' : vlid = atol(optarg);
-            break;
-        case 'f' : flags = atoi(optarg);
-            break;
-        case 'p' : s_port = atoi(optarg); 
-            break;
-        case 'i' : eth_iface = atoi(optarg);
-            break;
-        case 'c' : capture_iface = atoi(optarg);
-            break;
-        case 's' : strncpy(s_addr, optarg, 16);
-            break;
-        case 'd' : strncpy(d_addr, optarg, 16);
-            break;
-        case 'e' : strncpy(s_mac, optarg, 18);
-            break;
-        case 't' : strncpy(outer_d_mac, optarg, 18);
-            break;
-        case 'q' : strncpy(inner_d_mac, optarg, 18);
-            break;
         case 'a' :
             if(strcmp(optarg, "ADD") == 0) {
-                action = MAP_ADD;
+                mptm->action = MAP_ADD;
             } else if(strcmp(optarg, "DEL") == 0) {
-                action = MAP_DELETE;
+                mptm->action = MAP_DELETE;
             } else {
                 fprintf(stderr, "INVALID value for option -o %s\n", optarg);
                 return -1;
             }
             break;
-        case 'o' : output = atoi(optarg);
+        case 't' :
+            mptm->tunnel = atoi(optarg);
+            break;
+        case 'v' : mptm->vlid = atol(optarg);
+            break;
+        case 'f' : mptm->flags = atoi(optarg);
+            break;
+        case 'p' : mptm->source_port = atoi(optarg); 
+            break;
+        case 'I' : mptm->capture_iface = atoi(optarg);
+            break;
+        case 'r' : mptm->redirect = atoi(optarg);
+            break;
+        case 'R' : mptm->redirect_iface = atoi(optarg);
+            break;
+        case 's' : strncpy(mptm->source_addr, optarg, 16);
+            break;
+        case 'd' : strncpy(mptm->dest_addr, optarg, 16);
+            break;
+        case 'S' : strncpy(mptm->source_mac, optarg, 18);
+            break;
+        case 'D' : strncpy(mptm->outer_dest_mac, optarg, 18);
+            break;
+        case 'M' : strncpy(mptm->inner_dest_mac, optarg, 18);
+            break;
+        case 'V' : mptm->debug = atoi(optarg);
             break;
         default:
             fprintf(stderr, "INVALID parameter supplied %c\n", opt);
@@ -106,67 +157,64 @@ int parse_params(int argc, char *argv[]) {
       }
     }
 
-    if(action == MAP_ADD ) {
-        if (vlid == -1 || flags == -1 || capture_iface == -1 ||
-            eth_iface == -1 || s_addr[0] == '\0' || d_addr[0] == '\0' ||
-            outer_d_mac[0] == '\0' || s_mac[0] == '\0' || inner_d_mac == '\0') {
-            // if we need to add then we need all the other info to create
-            // tunnel structure.
-            fprintf(stderr, "operation is add but all argumnets are not provided\n");
-            return -1;
-        }
-        printf("All arguments verified\n");
-    } else if(capture_iface == -1) {
-        // for delete we only need iface.
-        fprintf(stderr, "operation is delete but key (-c) is not provided\n");
-        return 1;
-    }
-
-    return 0;
+    return verify_args(mptm);
 }
 
-tunnel_info* create_tun_info(char* s_mac, char* outer_d_mac, char* inner_d_mac,
-                             u_int32_t iface, u_int16_t flags, u_int64_t vlid,
-                             u_int16_t s_port, char* d_addr, char* s_addr) {
+tunnel_info* create_tun_info(mptm_args *mptm) {
 
-    tunnel_info *loc = (tunnel_info *)malloc(sizeof(tunnel_info));
+    mptm_tunnel_info *tn = (tunnel_info *)malloc(sizeof(mptm_tunnel_info));
 
-    loc->iface = iface;
-    loc->vlid = vlid;
-    loc->flags = flags;
-    loc->s_port = s_port;
+    tn->debug = mptm->debug;
+    tn->tunnel_type = mptm->tunnel;
+    tn->redirect = mptm->redirect;
+    tn->redirect_if = mptm->redirect_iface;
+    tn->flags = mptm->flags;
 
-    if (parse_mac(s_mac, loc->s_mac) < 0) {
-        fprintf(stderr, "d_mac value is incorrect\n");
-        return NULL;
+    switch (mptm->tunnel)
+    {
+    case VLAN:
+        vlan_tunnel_info *vlan = (vlan_tunnel_info *)&tn->tnl_info.vlan;
+        vlan->vlan_id = mptm->vlid;
+        break;
+    case GENEVE:
+        geneve_tunnel_info *geneve = (geneve_tunnel_info *)&tn->tnl_info.geneve;
+        geneve->vlan_id = mptm->vlid;
+        geneve->source_port = mptm->source_port;
+        if (parse_mac(mptm->source_mac, geneve->source_mac) < 0) {
+            fprintf(stderr, "source_mac value is incorrect\n");
+            return NULL;
+        }
+        if (parse_mac(mptm->outer_dest_mac, geneve->dest_mac) < 0) {
+            fprintf(stderr, "outer_dest_mac value is incorrect\n");
+            return NULL;
+        }
+        if (parse_mac(mptm->inner_dest_mac, geneve->inner_dest_mac) < 0) {
+            fprintf(stderr, "inner_d_mac value is incorrect\n");
+            return NULL;
+        }
+        geneve->dest_addr = parse_ipv4(mptm->dest_addr);
+        if (geneve->dest_addr == -1) {
+            fprintf(stderr, "dest_addr value is incorrect\n");
+            return NULL;
+        }
+        geneve->source_addr = parse_ipv4(mptm->source_mac);
+        if (geneve->source_addr == -1) {
+            fprintf(stderr, "source_addr value is incorrect\n");
+            return NULL;
+        }
+        break;
+    default:
+        break;
     }
-    if (parse_mac(outer_d_mac, loc->d_mac) < 0) {
-        fprintf(stderr, "d_mac value is incorrect\n");
-        return NULL;
-    }
-    if (parse_mac(inner_d_mac, loc->inner_d_mac) < 0) {
-        fprintf(stderr, "inner_d_mac value is incorrect\n");
-        return NULL;
-    }
-    loc->d_addr = parse_ipv4(d_addr);
-    if (loc->d_addr == -1) {
-        fprintf(stderr, "d_addr value is incorrect\n");
-        return NULL;
-    }
-    loc->s_addr = parse_ipv4(s_addr);
-    if (loc->s_addr == -1) {
-        fprintf(stderr, "s_addr value is incorrect\n");
-        return NULL;
-    }
-
-    loc->debug = output;
 
      return loc;
 }
 
 int main(int argc, char **argv) {
 
-    if (parse_params(argc, argv) != 0) {
+    mptm_args *mptm_args = (mptm_args *)zalloc(sizeof(mptm_args));
+
+    if (parse_params(argc, argv, mptm_args) != 0) {
         fprintf(stderr, "parsing params failed\n");
         print_usage();
         exit(EXIT_FAILURE);
@@ -181,13 +229,12 @@ int main(int argc, char **argv) {
 
     tunnel_info *ti = NULL;
     if (action == MAP_ADD) {
-        ti = create_tun_info(s_mac, outer_d_mac, inner_d_mac, eth_iface,
-                             flags, vlid, s_port, d_addr, s_addr);
+        ti = create_tun_info(mptm_args);
         if(ti == NULL) {
             fprintf(stderr, "failed creating struct\n");
             return EXIT_FAIL_OPTION;
         }
     }
 
-    return update_map(tunnel_map_fd, action, &capture_iface, ti, 0, TUNNEL_IFACE_MAP);
+    return update_map(tunnel_map_fd, action, &mptm_args->capture_iface, ti, 0, TUNNEL_IFACE_MAP);
 }

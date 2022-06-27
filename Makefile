@@ -7,7 +7,7 @@ KERNEL_SRC_DIR ?= ${SRC_DIR}/kernel
 
 XDP_PROGS    := mptm_xdp_tunnels xdp_redirect
 XDP_TARGETS  := ${XDP_PROGS:=.o}
-USER_TARGETS := #${XDP_PROGS:=_user}
+USER_TARGETS := ${XDP_PROGS:=_user}
 USER_LIBS    := -lbpf -lm
 
 $(info XDP_TARGETS is [${XDP_TARGETS}])
