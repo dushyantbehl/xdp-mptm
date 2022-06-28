@@ -42,7 +42,7 @@ static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
       goto out;
     if (eth->h_proto == bpf_htons(ETH_P_ARP))
       goto out;
-    if (h_proto != __constant_htons(ETH_P_IP))
+    if (eth->h_proto != __constant_htons(ETH_P_IP))
         // We don't support ipv6 for now.
         goto out;
 

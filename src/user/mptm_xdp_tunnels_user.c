@@ -35,12 +35,27 @@ typedef struct mptm_arguments {
     u_int8_t redirect;
 } mptm_args;
 
-// TODO: Update
 void  print_usage() {
-  printf("[USAGE]: a:t:v:f:p:I:R:s:S:d:D:M:V:\n");
-  printf("v:vlanid f:flags p:source_port c:capture_iface_index(for egress say veth0)"
-         " i:redirect_iface_index(for egress say eth0) s:s_ipaddr d:d_ipdaddr e:s_mac"
-         " t:outer_d_mac q:inner_d_mac a:action [ADD/DEL]\n");
+  printf("\nPlease see usage:\n"
+         "\t -t/--tunnel <1 for VLAN / 3 for GENEVE>\n"
+         "\t tunnel VLAN:-\n"
+         "\t\t -v/--vlid <vlan id>\n"
+         "\t tunnel GENEVE:-\n"
+         "\t\t -v/--vlid <vlan id>\n"
+         "\t\t -p/--source_port <port-num>\n"
+         "\t\t -I/--ingress_iface <dev-num>\n"
+         "\t\t -s/--source_ip <source-ip e.g. 10.1.1.1>\n"
+         "\t\t -S/--source_mac <source-mac e.g. aa:bb:cc:dd:ee:ff>\n"
+         "\t\t -d/--dest_ip <dest-ip e.g. 10.1.1.1>\n"
+         "\t\t -D/--dest_mac <dest-mac e.g. aa:bb:cc:dd:ee:ff>\n"
+         "\t\t -M/--inner_dest_mac <inner-dest-mac e.g. aa:bb:cc:dd:ee:ff>\n"
+         "\t common options:-\n"
+         "\t\t -r/--redirect <1 or 0>\n"
+         "\t\t -R/--redirect_iface <dev-num>\n"
+         "\t\t -f/--flags <0>\n"
+         "\t\t -v/--verbose <1 or 0>\n"
+         "\t\t -a/--action [ADD/DEL] rule\n"
+        );
 }
 
 static const struct option long_options[] = {
@@ -74,27 +89,27 @@ int verify_args(mptm_args *mptm) {
                 mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac[0] == '\0') {
                 // if we need to add then we need all the other info to create
                 // tunnel structure.
-                fprintf(stderr, "operation is add but all argumnets are not provided\n");
+                fprintf(stderr, "ERR: operation is add but all argumnets are not provided\n");
                 return -1;
             }
             printf("All arguments verified\n");
-        } else if(mptm->capture_iface == 0) {
-            // for delete we only need iface.
-            fprintf(stderr, "operation is delete but key (-c) is not provided\n");
+        } else if(mptm->dest_addr[0] == '\0') {
+            // for delete we only need key.
+            fprintf(stderr, "ERR: operation is delete but key (-c) is not provided\n");
             return 1;
         }
       break;
     case VLAN:
         if (action == MAP_ADD) {
             // currently we don't check vlanid as it can be zero
-        } else if(mptm->capture_iface == 0) {
-            // for delete we only need iface.
-            fprintf(stderr, "operation is delete but key (-c) is not provided\n");
+        } else if(mptm->dest_addr[0] == '\0') {
+            // for delete we only need key.
+            fprintf(stderr, "ERR: operation is delete but key (-c) is not provided\n");
             return 1;
         }
       break;
     default:
-        fprintf(stderr, "Unknown type of tunnel\n");
+        fprintf(stderr, "ERR: Unknown type of tunnel\n");
         return 1;
     }
     return 0;
@@ -114,7 +129,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
             } else if(strcmp(optarg, "DEL") == 0) {
                 mptm->action = MAP_DELETE;
             } else {
-                fprintf(stderr, "INVALID value for option -o %s\n", optarg);
+                fprintf(stderr, "ERR: INVALID value for option -o %s\n", optarg);
                 return -1;
             }
             break;
@@ -146,7 +161,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
         case 'V' : mptm->debug = atoi(optarg);
             break;
         default:
-            fprintf(stderr, "INVALID parameter supplied %c\n", opt);
+            fprintf(stderr, "ERR: INVALID parameter supplied %c\n", opt);
             return -1;
       }
     }
@@ -175,25 +190,25 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
         geneve->vlan_id = mptm->vlid;
         geneve->source_port = mptm->source_port;
         if (parse_mac(mptm->source_mac, geneve->source_mac) < 0) {
-            fprintf(stderr, "source_mac value is incorrect\n");
+            fprintf(stderr, "ERR: source_mac value is incorrect\n");
             return NULL;
         }
         if (parse_mac(mptm->outer_dest_mac, geneve->dest_mac) < 0) {
-            fprintf(stderr, "outer_dest_mac value is incorrect\n");
+            fprintf(stderr, "ERR: outer_dest_mac value is incorrect\n");
             return NULL;
         }
         if (parse_mac(mptm->inner_dest_mac, geneve->inner_dest_mac) < 0) {
-            fprintf(stderr, "inner_d_mac value is incorrect\n");
+            fprintf(stderr, "ERR: inner_d_mac value is incorrect\n");
             return NULL;
         }
         geneve->dest_addr = parse_ipv4(mptm->dest_addr);
         if (geneve->dest_addr == -1) {
-            fprintf(stderr, "dest_addr value is incorrect\n");
+            fprintf(stderr, "ERR: dest_addr value is incorrect\n");
             return NULL;
         }
         geneve->source_addr = parse_ipv4(mptm->source_mac);
         if (geneve->source_addr == -1) {
-            fprintf(stderr, "source_addr value is incorrect\n");
+            fprintf(stderr, "ERR: source_addr value is incorrect\n");
             return NULL;
         }
       }
@@ -210,7 +225,7 @@ int main(int argc, char **argv) {
     mptm_args *mptm = (mptm_args *)malloc(sizeof(mptm_args));
 
     if (parse_params(argc, argv, mptm) != 0) {
-        fprintf(stderr, "parsing params failed\n");
+        fprintf(stderr, "ERR: parsing params failed\n");
         print_usage();
         exit(EXIT_FAILURE);
     }
@@ -218,7 +233,7 @@ int main(int argc, char **argv) {
     /* Open the map for geneve config */
     int tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_IFACE_MAP, NULL);
     if (tunnel_map_fd < 0) {
-          fprintf(stderr, "cannot open tunnel iface map\n");
+          fprintf(stderr, "ERR: cannot open tunnel iface map\n");
         return EXIT_FAIL_BPF;
     }
 
@@ -226,7 +241,7 @@ int main(int argc, char **argv) {
     if (mptm->action == MAP_ADD) {
         ti = create_tun_info(mptm);
         if(ti == NULL) {
-            fprintf(stderr, "failed creating struct\n");
+            fprintf(stderr, "ERR: failed creating struct\n");
             return EXIT_FAIL_OPTION;
         }
     }
@@ -234,4 +249,5 @@ int main(int argc, char **argv) {
     uint32_t key = parse_ipv4(mptm->dest_addr);
     return update_map(tunnel_map_fd, mptm->action, &key, ti, 0, TUNNEL_IFACE_MAP);
 }
+
 
