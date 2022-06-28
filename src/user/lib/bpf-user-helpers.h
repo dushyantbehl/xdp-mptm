@@ -69,13 +69,10 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
 /*
   Parse an ipv4 address and put the content in an integer with individual
   subnets bit shifted by 8.
-
-  tunnel_info expects the d_addr and s_addr to be in __be32 format
-  __be32 is nothing but uint32_t but naming here helps in 
-  identifying the way this integer is to be created.
+  [10, 10, 1, 2] becomes 10100102
 */
-__be32 parse_ipv4(char ipadr[]) {
-    __be32 addr = 0, val;
+uint_32_t parse_ipv4(char ipadr[]) {
+    uint_32_t addr = 0, val;
     char *tok = strtok(ipadr,".");
     for (int i=0; i<4; i++) {
         val = strtol(tok, NULL, 10);

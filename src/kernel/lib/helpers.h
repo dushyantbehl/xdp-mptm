@@ -31,6 +31,7 @@ static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
     /* These keep track of the next header type and iterator pointer */
     struct ethhdr *eth;
     int nh_type;
+    struct iphdr *iphdr;
 
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
@@ -41,9 +42,15 @@ static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
       goto out;
     if (eth->h_proto == bpf_htons(ETH_P_ARP))
       goto out;
+    if (h_proto != __constant_htons(ETH_P_IP))
+        // We don't support ipv6 for now.
+        goto out;
 
-    //TODO: Change to ip based lookup
-    __u32 key = ctx->ingress_ifindex;
+    nh_type = parse_iphdr(&nh, data_end, &iphdr);
+    if (nh_type == -1)
+      goto out;
+
+    __u32 key = bpf_ntohl(iphdr->daddr);
     tn = bpf_map_lookup_elem(&mptm_tunnel_iface_map, &key);
     if(tn == NULL) {
       bpf_debug("[ERR] map entry missing for key %d\n", key);

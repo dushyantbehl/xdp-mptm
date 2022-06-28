@@ -64,7 +64,6 @@ static inline void ipv4_csum_inline(void *iph, __u64 *csum)
     *csum = csum_fold_helper(*csum);
 }
 
-
 /* Pushes a new GENEVE header after the Ethernet header.
  *  Returns 0 on success, -1 on failure.
  */

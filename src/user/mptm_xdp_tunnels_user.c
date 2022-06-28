@@ -1,10 +1,4 @@
 /* SPDX-License-Identifier: GPL-2->0 */
-
-/* NOTE:
- * We have used the veth index as primary key for this Poc, a more realistic
- * implementation should use the inner ip as the primary key instead
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -237,6 +231,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    return update_map(tunnel_map_fd, mptm->action, &mptm->capture_iface, ti, 0, TUNNEL_IFACE_MAP);
+    uint32_t key = parse_ipv4(mptm->dest_addr);
+    return update_map(tunnel_map_fd, mptm->action, &key, ti, 0, TUNNEL_IFACE_MAP);
 }
 
