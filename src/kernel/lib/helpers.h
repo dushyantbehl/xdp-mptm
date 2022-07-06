@@ -50,7 +50,7 @@ static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
     if (nh_type == -1)
       goto out;
 
-    __u32 key = bpf_ntohl(iphdr->daddr);
+    __u32 key = bpf_ntohl(iphdr->saddr);
     tn = bpf_map_lookup_elem(&mptm_tunnel_iface_map, &key);
     if(tn == NULL) {
       bpf_debug("[ERR] map entry missing for key %d\n", key);

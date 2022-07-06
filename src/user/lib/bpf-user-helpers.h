@@ -71,8 +71,14 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
   subnets bit shifted by 8.
   [10, 10, 1, 2] becomes 10100102
 */
-uint32_t parse_ipv4(char ipadr[]) {
+uint32_t parse_ipv4(char _ipadr[]) {
+
+    char ipadr[16];
     uint32_t addr = 0, val;
+
+    // Make a copy of the string before breaking it down
+    strlcpy(ipadr, _ipadr, 16);
+
     char *tok = strtok(ipadr,".");
     for (int i=0; i<4; i++) {
         val = strtol(tok, NULL, 10);
