@@ -34,28 +34,28 @@ Load the bpf programs
 ```
 $ cd build/
 $ bpftool prog loadall xdp_redirect.o /sys/fs/bpf/xdp-redirect type xdp -d
-$ bpftool prog loadall xdp_geneve.o /sys/fs/bpf/xdp-geneve type xdp -d
+$ bpftool prog loadall xdp_redirect.o /sys/fs/bpf/xdp-redirect type xdp -d
 $ ls /sys/fs/bpf/
-xdp-geneve  xdp-redirect
+mptm_xdp_tunnels  xdp-redirect
 $ bpftool prog show
-1236: xdp  name mptm_xdp_geneve  tag 3882107b0c8fafd5  gpl
-        loaded_at 2022-05-04T10:58:05+0000  uid 0
-        xlated 2640B  jited 1478B  memlock 4096B  map_ids 195,196
-        btf_id 250
-1237: xdp  name xdp_pass_func  tag 3b185187f1855c4c  gpl
-        loaded_at 2022-05-04T10:58:05+0000  uid 0
+295: xdp  name xdp_prog_redire  tag 003a56830efdd07e  gpl
+        loaded_at 2022-07-06T07:14:26+0000  uid 0
+        xlated 496B  jited 282B  memlock 4096B  map_ids 148
+        btf_id 225
+299: xdp  name mptm_xdp_tunnel  tag 50719ae3b21776a6  gpl
+        loaded_at 2022-07-06T07:15:01+0000  uid 0
+        xlated 4752B  jited 2618B  memlock 8192B  map_ids 149,150
+        btf_id 230
+300: xdp  name mptm_xdp_pass_f  tag 3b185187f1855c4c  gpl
+        loaded_at 2022-07-06T07:15:01+0000  uid 0
         xlated 16B  jited 18B  memlock 4096B
-        btf_id 250
-1241: xdp  name xdp_prog_redire  tag 0af5eaf32951b2e9  gpl
-        loaded_at 2022-05-04T10:58:31+0000  uid 0
-        xlated 328B  jited 189B  memlock 4096B  map_ids 197
-        btf_id 255
+        btf_id 230
 ```
 
 Attach to the interfaces ingress
 
 ```
-$ bpftool net attach xdp id 114 dev veth-node1 overwrite
+$ bpftool net attach xdp id 299 dev veth-node1 overwrite
 $ bpftool net attach xdp id 110 dev geneve0 overwrite
 ```
 
@@ -64,97 +64,96 @@ $ bpftool net attach xdp id 110 dev geneve0 overwrite
 Check the maps created using below command
 ```
 $ bpftool map show
-195: hash  name tunnel_map_ifac  flags 0x0
-        key 4B  value 40B  max_entries 30  memlock 12288B
-196: percpu_array  name xdp_stats_map  flags 0x0
-        key 4B  value 16B  max_entries 5  memlock 8192B
-197: hash  name redirect_map  flags 0x0
+148: hash  name mptm_redirect_m  flags 0x0
         key 4B  value 4B  max_entries 30  memlock 8192B
-202: array  flags 0x0
+149: hash  name mptm_tunnel_ifa  flags 0x0
+        key 4B  value 64B  max_entries 30  memlock 16384B
+150: percpu_array  name xdp_stats_map  flags 0x0
+        key 4B  value 16B  max_entries 5  memlock 8192B
+155: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-204: array  name pid_iter.rodata  flags 0x480
+157: array  name pid_iter.rodata  flags 0x480
         key 4B  value 4B  max_entries 1  memlock 8192B
-        btf_id 265  frozen
-        pids bpftool(1094964)
-205: array  flags 0x0
+        btf_id 240  frozen
+        pids bpftool(459604)
+158: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
 ```
 
-Notice the `tunnel_map_ifac` and `redirect_map` needed by `mptm_xdp_geneve` and `xdp_prog_redirect` respectively
+Notice the `mptm_tunnel_ifa` and `mptm_redirect_m` needed by `mptm_xdp_tunnels` and `xdp_prog_redirect` respectively
 
 Now pin the maps using these commands below, the map ids are taken from map show command, notice that the `bpftool prog show`
 command output lists the *map_ids* being used by the programs, if you see multiple maps then use those *ids* below which are
 listed with program.
 
 ```
-$ bpftool map pin id 195 /sys/fs/bpf/tunnel_map_iface
+$ bpftool map pin id 195 /sys/fs/bpf/mptm_tunnels_map
 $ bpftool map pin id 197 /sys/fs/bpf/redirect_map
 $ ls /sys/fs/bpf/
-redirect_map  tunnel_map_iface  xdp-geneve  xdp-redirect
+redirect_map  mptm_tunnels_map  xdp-geneve  xdp-redirect
 ```
 
 We need to populate the maps with information regarding tunnel outer packet header, ip address to mangle, mac addresses and interfaces to look for.
-We will use the [`xdp_geneve_user`](./xdp_geneve_user.c) binary we compiled in the [build](#build) step to do that.
+We will use the [`mptm_xdp_tunnels_user`](./src/user/mptm_xdp_tunnels_user.c  binary we compiled in the [build](#build) step to do that.
 
 The binary `xdp_geneve_user` needs [libbpf](./deps/libbpf/) shared library for running which gets compiled on your system the
-first time you run `make`. To pass shared libary to the binary at runtime you can use this command,
+first time you run `make`.
+
+The command is run as,
 
 ```
-export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
-```
-
-run from inside the root directory of project.
-
-The command is run with the following parameters.
-
-`xdp_geneve_user -f GENEVE-FLAGS -v VLAN-ID -p SOURCE_PORT -c CAPTURE_INTERFACE -i IFACE_ID_OF_VETH_NODE1_ROOTNS -s IP_ADDRESS_OF_VETH_INSIDE_NODE1_NS -d IP_OF_OTHER_NODE_ETH0 -e VETH_MAC_INSIDE_NS -t MAC_OF_OTHER_NODE_ETH0 -q VETH_MAC_OF_NODE2_ROOT_NS -o ADD`
-
-For instance, run
-
-```
-$ ./build/xdp_geneve_user -f 0 -v 1 -p 51234 -c 14 -i 13 -s 10.200.1.100 -d 10.20.20.2 -e 3a:f1:23:63:d3:c6 -t b8:ce:f6:27:93:39 -q d6:75:d1:42:61:5c -o ADD
+$ ./build/mptm_xdp_tunnels_user --verbose 1 --redirect 0 --flags 0 --tunnel 3 --vlid 0 --source_port 51234 --ingress_iface 48 --source_ip 10.200.1.100 --source_mac 16:d5:6c:3a:46:95 --dest_ip 10.20.20.2 --dest_mac b8:ce:f6:27:93:39 --inner_dest_mac c2:92:e5:ab:9d:88 -a ADD
+opt: V arg: 1 
+opt: r arg: 0 
 opt: f arg: 0 
-opt: v arg: 1 
+opt: t arg: 3 
+opt: v arg: 0 
 opt: p arg: 51234 
-opt: c arg: 14 
-opt: i arg: 13 
+opt: I arg: 48 
 opt: s arg: 10.200.1.100 
+opt: S arg: 16:d5:6c:3a:46:95 
 opt: d arg: 10.20.20.2 
-opt: e arg: 3a:f1:23:63:d3:c6 
-opt: t arg: b8:ce:f6:27:93:39 
-opt: q arg: d6:75:d1:42:61:5c 
-opt: o arg: ADD 
-Using map dir: /sys/fs/bpf, iface 13 
-operation is add, adding tunnel iface entry
+opt: D arg: b8:ce:f6:27:93:39 
+opt: M arg: c2:92:e5:ab:9d:88 
+opt: a arg: ADD 
+Arguments verified
+Opened bpf map file /sys/fs/bpf/mptm_tunnels_map
+Creating tunnel info object
+Tunnel info object created
+Key (dest ip) is 169088002
+action is add, adding mptm_tunnels_map entry
 ```
 
 Check if map entry got created by - 
 
 ```
 $ bpftool map show
-195: hash  name tunnel_map_ifac  flags 0x0
-        key 4B  value 40B  max_entries 30  memlock 12288B
-196: percpu_array  name xdp_stats_map  flags 0x0
-        key 4B  value 16B  max_entries 5  memlock 8192B
-197: hash  name redirect_map  flags 0x0
+148: hash  name mptm_redirect_m  flags 0x0
         key 4B  value 4B  max_entries 30  memlock 8192B
-206: array  flags 0x0
+149: hash  name mptm_tunnel_ifa  flags 0x0
+        key 4B  value 64B  max_entries 30  memlock 16384B
+150: percpu_array  name xdp_stats_map  flags 0x0
+        key 4B  value 16B  max_entries 5  memlock 8192B
+159: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-208: array  name pid_iter.rodata  flags 0x480
+161: array  name pid_iter.rodata  flags 0x480
         key 4B  value 4B  max_entries 1  memlock 8192B
-        btf_id 270  frozen
-        pids bpftool(1097717)
-209: array  flags 0x0
+        btf_id 245  frozen
+        pids bpftool(460357)
+162: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-$ bpftool map dump id 195
+$ bpftool map dump id 149
 key:
-12 00 00 00
+02 14 14 0a
 value:
-0f 00 98 00 00 00 00 00  00 00 00 00 22 c8 02 0a
-0a 0a 02 01 c8 0a 5e 81  0b 8b 15 46 c6 0e 4b 59
-85 dd b8 ce f6 27 93 38
+01 03 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  22 c8 00 00 02 14 14 0a
+64 01 c8 0a c2 92 e5 ab  9d 88 16 d5 6c 3a 46 95
+b8 ce f6 27 93 39 00 00  00 00 00 00 00 00 00 00
 Found 1 element
 ```
+
+TODO: Update
 
 Add an entry to the redirect map for reverse path traffic as,
 `xdp_geneve_user -c CAPTURE_INTERFACE -i IFACE_ID_OF_VETH_NODE1_ROOTNS -r IFACE_ID_OF_GENEVE0_NODE1 -o ADD`
@@ -197,3 +196,10 @@ Cleaning iptables completely
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 
 ```
+
+If the `libbpf` library doesn't load then to pass shared libary to the binary at runtime you can use this command,
+```
+export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
+```
+
+run from inside the root directory of project.
