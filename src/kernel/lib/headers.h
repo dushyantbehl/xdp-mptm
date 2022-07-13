@@ -34,17 +34,6 @@
 #define __inline inline __attribute__((always_inline))
 #endif
 
-#ifndef bpf_debug
-#define bpf_debug(fmt, ...) \
-({ \
-const char ____fmt[] = fmt; \
-bpf_trace_printk(____fmt, sizeof(____fmt), \
-##__VA_ARGS__); \
-})
-#else
-#define bpf_debug(fmt, ...) { } while (0)
-#endif
-
 #define __ALWAYS_INLINE__ __attribute__((__always_inline__))
 
 #ifndef __ALWAYS_INLINE__

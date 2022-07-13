@@ -29,6 +29,7 @@ typedef struct mptm_arguments {
     u_int16_t flags;
     u_int16_t source_port;
     u_int16_t redirect_iface;
+    char inner_source_addr[16];
     char source_addr[16];
     char dest_addr[16];
     char source_mac[18];
@@ -59,6 +60,7 @@ void  print_usage() {
          "\t\t -f/--flags <0>\n"
          "\t\t -v/--verbose <1 or 0>\n"
          "\t\t -a/--action [ADD/DEL] rule\n"
+         "\t\t -k/--key inner source addr for now\n"
         );
 }
 
@@ -78,6 +80,7 @@ static const struct option long_options[] = {
         {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
         {"verbose",        required_argument, NULL, 'V'},
         {"tunnel",         required_argument, NULL, 't'},
+        {"key",            required_argument, NULL, 'k'},
         {0, 0, NULL, 0}
 };
 
@@ -128,7 +131,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     int opt = 0;
     int long_index = 0;
 
-    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:V:", 
+    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:V:k:", 
                                  long_options, &long_index )) != -1 ) {
       printf("opt: %c arg: %s \n", opt, optarg);
       switch (opt) {
@@ -171,6 +174,8 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
         case 'M' : strncpy(mptm->inner_dest_mac, optarg, 18);
             break;
         case 'V' : mptm->debug = atoi(optarg);
+            break;
+        case 'k' : strncpy(mptm->inner_source_addr, optarg, 16);
             break;
         default:
             fprintf(stderr, "ERR: INVALID parameter supplied %c\n", opt);
@@ -264,7 +269,7 @@ int main(int argc, char **argv) {
         fprintf(stdout, "created\n");
     }
 
-    uint32_t key = parse_ipv4(mptm->source_addr);
+    uint32_t key = parse_ipv4(mptm->inner_source_addr);
     fprintf(stdout, "Key (source ip) is %d\n", key);
 
     return update_map(tunnel_map_fd, mptm->action, &key, ti, 0, TUNNEL_IFACE_MAP);

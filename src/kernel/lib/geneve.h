@@ -16,6 +16,8 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
+#include <kernel/lib/mptm_debug.h>
+
 #define DEFAULT_TTL 64
 #define GEN_DSTPORT 0xc117
 
@@ -81,7 +83,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
 
     struct ethhdr *eth_inner_hdr = (struct ethhdr *)data;
     if (eth_inner_hdr + 1 > data_end ){
-        bpf_debug("[Agent: ] ABORTED: Bad ETH header offset \n");
+        mptm_print("[Agent: ] ABORTED: Bad ETH header offset \n");
         return XDP_ABORTED;
     }
 
@@ -92,8 +94,8 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
         gnv_hdr_size + udp_hdr_size + ip_hdr_size + eth_hdr_size;
 
     long ret = bpf_xdp_adjust_head(ctx, (0-outer_hdr_size));
-           if (ret != 0l) {
-        bpf_debug("[Agent:] DROP (BUG): Failure adjusting packet header!\n");
+    if (ret != 0l) {
+        mptm_print("[Agent:] DROP (BUG): Failure adjusting packet header!\n");
         return XDP_DROP;
     }
 
@@ -104,22 +106,22 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     ethcpy = data;
 
     if (ethcpy + 1 > data_end ) {
-        bpf_debug("[Agent: ] ABORTED: Bad ETH header offset \n");
+        mptm_print("[Agent: ] ABORTED: Bad ETH header offset \n");
         return XDP_ABORTED;
     }
     struct iphdr *ip = (struct iphdr *)(ethcpy + 1);
     if (ip + 1 > data_end){
-        bpf_debug("ABORTED: Bad ip header offset ip: %x data_end:%x \n", ip+1, data_end);
+        mptm_print("ABORTED: Bad ip header offset ip: %x data_end:%x \n", ip+1, data_end);
         return XDP_ABORTED;
     }
     struct udphdr *udp = (struct udphdr*)(ip + 1);
     if (udp + 1 > data_end){
-        bpf_debug("ABORTED: Bad udp header offset \n");
+        mptm_print("ABORTED: Bad udp header offset \n");
         return XDP_ABORTED;
     }
     struct genevehdr *geneve = (struct genevehdr*)(udp +1);
     if (geneve + 1 > data_end){
-        bpf_debug("ABORTED: Bad GENEVE header offset \n");
+        mptm_print("ABORTED: Bad GENEVE header offset \n");
         return XDP_ABORTED;
     }
 

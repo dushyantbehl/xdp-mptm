@@ -52,6 +52,10 @@ LDFLAGS ?= -L$(LIBBPF_DIR)
 BPF_CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -I${HEADERS_DIR}/ -I$(DEPS)/ -I$(SRC_DIR)/
 LIBS = -l:libbpf.a -lelf -lz $(USER_LIBS)
 
+ifeq ($(MPTM_DEBUG), y)
+BPF_CFLAGS += -D__MPTM_DEBUG__
+endif
+
 all: llvm-check create-dirs $(USER_TARGETS) $(XDP_TARGETS) $(COPY_LOADER) $(COPY_STATS)
 
 .PHONY: clean $(CLANG) $(LLC)

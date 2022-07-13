@@ -2,8 +2,7 @@
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 
-/* only for bpf_debug function */
-#include <kernel/lib/headers.h>
+#include <kernel/lib/mptm_debug.h>
 
 #define MAX_ENTRIES 30
 
@@ -21,11 +20,11 @@ int  xdp_prog_redirect(struct xdp_md *ctx) {
     __u32 *val = bpf_map_lookup_elem(&mptm_redirect_map, &key);
 
     if(val == NULL){
-      bpf_debug("[ERR] map entry missing for iface %d\n", key);
+      mptm_print("[ERR] map entry missing for iface %d\n", key);
       return XDP_PASS;
     }
 
-    bpf_debug("redirecting packet from  %d -> %d\n", key, *val);
+    mptm_print("redirecting packet from  %d -> %d\n", key, *val);
 
     return bpf_redirect(*val, flags);
 }

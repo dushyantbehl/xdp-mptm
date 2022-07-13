@@ -33,7 +33,7 @@ We provide 2 files to setup system according to the architecture above
 Load the bpf programs
 ```
 $ cd build/
-$ bpftool prog loadall xdp_redirect.o /sys/fs/bpf/xdp-redirect type xdp -d
+$ bpftool prog loadall mptm_xdp_tunnels.o /sys/fs/bpf/mptm_xdp_tunnels type xdp -d
 $ bpftool prog loadall xdp_redirect.o /sys/fs/bpf/xdp-redirect type xdp -d
 $ ls /sys/fs/bpf/
 mptm_xdp_tunnels  xdp-redirect
@@ -102,7 +102,7 @@ first time you run `make`.
 The command is run as,
 
 ```
-$ ./build/mptm_xdp_tunnels_user --verbose 1 --redirect 0 --flags 0 --tunnel 3 --vlid 0 --source_port 51234 --ingress_iface 48 --source_ip 10.200.1.100 --source_mac 16:d5:6c:3a:46:95 --dest_ip 10.20.20.2 --dest_mac b8:ce:f6:27:93:39 --inner_dest_mac c2:92:e5:ab:9d:88 -a ADD
+$ ./mptm_xdp_tunnels_user --verbose 1 --redirect 0 --flags 0 --tunnel 3 --vlid 0 --source_port 51234 --ingress_iface 48 --source_ip 10.200.1.100 --source_mac 76:42:54:45:13:b0  --dest_ip 10.20.20.2 --dest_mac b8:ce:f6:27:93:39 --inner_dest_mac c2:92:e5:ab:9d:88 -a ADD
 opt: V arg: 1 
 opt: r arg: 0 
 opt: f arg: 0 
@@ -111,16 +111,15 @@ opt: v arg: 0
 opt: p arg: 51234 
 opt: I arg: 48 
 opt: s arg: 10.200.1.100 
-opt: S arg: 16:d5:6c:3a:46:95 
+opt: S arg: 76:42:54:45:13:b0 
 opt: d arg: 10.20.20.2 
 opt: D arg: b8:ce:f6:27:93:39 
 opt: M arg: c2:92:e5:ab:9d:88 
 opt: a arg: ADD 
 Arguments verified
 Opened bpf map file /sys/fs/bpf/mptm_tunnels_map
-Creating tunnel info object
-Tunnel info object created
-Key (dest ip) is 169088002
+Creating tunnel info object......created
+Key (source ip) is 180879716
 action is add, adding mptm_tunnels_map entry
 ```
 
