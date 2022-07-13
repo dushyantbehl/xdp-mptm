@@ -9,13 +9,9 @@
 #include <locale.h>
 #include <unistd.h>
 #include <time.h>
-#include <arpa/inet.h>
 
 #include <kernel/lib/headers.h>
 #include <user/lib/bpf-user-helpers.h>
-
-#define str(x)  #x
-#define xstr(x) str(x)
 
  /* custom ones from xdp examples */
 #include <common/xdp_stats_kern_user.h>
@@ -257,61 +253,34 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
      return tn;
 }
 
-char *get_tunnel_name(uint8_t tunnel) {
-    char *tunnel_name = NULL;
-    switch (tn->tunnel)
-    {
-    case GENEVE:
-        *tunnel_name = xstr(GENEVE);
-        break;
-    case VLAN:
-        *tunnel_name = xstr(VLAN);
-        break;
-    case VXLAN:
-        *tunnel_name = xstr(VXLAN);
-        break;
-    default:
-        *tunnel_name = "UNKNOWN";
-        break;
-    }
-    return tunnel_name;
-}
-
-char *decode_ipv4(uint32_t ip) {
-    struct in_addr ip_addr;
-    ip_addr.s_addr = ip;
-    return inet_ntoa(ip_addr);
-}
-
-#define decode_mac(mac, eth) ({ \
-    char eth[18];               \
-    sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
-    eth;\
-})
-
 void dump_tunnel_info(mptm_tunnel_info *tn) {
+
+    if (tn == NULL) {
+        return;
+    }
+
     printf("Tunnel info element - {\n");
-    printf("debug = %u\n", tn->debug);
-    printf("redirect = %u\n", tn->redirect);
-    printf("redirect_if = %u\n", tn->redirect_if);
-    printf("flags = %u\n", tn->flags);
-    printf("tunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
+    printf("\tdebug = %u\n", tn->debug);
+    printf("\tredirect = %u\n", tn->redirect);
+    printf("\tredirect_if = %u\n", tn->redirect_if);
+    printf("\tflags = %u\n", tn->flags);
+    printf("\ttunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
     switch (tn->tunnel_type)
     {
     case VLAN: {
         struct vlan_info *vlan = (struct vlan_info *)(&tn->tnl_info.vlan);
-        printf("vlan_id = %u\n", vlan->vlan_id);
+        printf("\tvlan_id = %u\n", vlan->vlan_id);
     }
     break;
     case GENEVE: {
         struct geneve_info *geneve = (struct geneve_info *)(&tn->tnl_info.geneve);
-        printf("vlan_id = %u\n",geneve->vlan_id);
-        printf("source_port = %u\n",geneve->source_port);
-        printf("source_mac = %s\n",decode_mac(geneve->source_mac));
-        printf("outer_dest_mac = %s\n", decode_mac(geneve->dest_mac));
-        printf("inner_dest_mac = %s\n", decode_mac(geneve->inner_dest_mac));
-        printf("dest_addr = %s\n", decode_ipv4(geneve->dest_addr));
-        printf("source_addr = %s\n", decode_ipv4(geneve->source_addr));
+        printf("\tvlan_id = %llu\n",geneve->vlan_id);
+        printf("\tsource_port = %u\n",geneve->source_port);
+        printf("\tsource_mac = %s\n",decode_mac(geneve->source_mac));
+        printf("\touter_dest_mac = %s\n", decode_mac(geneve->dest_mac));
+        printf("\tinner_dest_mac = %s\n", decode_mac(geneve->inner_dest_mac));
+        printf("\tdest_addr = %s\n", decode_ipv4(geneve->dest_addr));
+        printf("\tsource_addr = %s\n", decode_ipv4(geneve->source_addr));
     }
     break;
     default:
@@ -347,8 +316,8 @@ int main(int argc, char **argv) {
     switch (mptm->action)
     {
     case MAP_GET: {
-        void *elem = (void *)lookup_map(tunnel_map_fd, &key, TUNNEL_IFACE_MAP);
-        mptm_tunnel_info *ti = (mptm_tunnel_info *)elem;
+        mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
+        lookup_map(tunnel_map_fd, &key, ti, TUNNEL_IFACE_MAP);
         dump_tunnel_info(ti);
         break;
     }

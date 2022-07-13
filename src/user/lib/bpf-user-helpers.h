@@ -10,8 +10,16 @@
 #include <linux/if_link.h> /* depend on kernel-headers installed */
 #include <linux/bpf.h>
 
+#include <arpa/inet.h>
+#include <byteswap.h>
+ 
 #include <common/common_defines.h>
 #include <common/common_user_bpf_xdp.h>
+
+#include <kernel/lib/headers.h> 
+
+#define str(x)  #x
+#define xstr(x) str(x)
 
 #define PIN_BASE_DIR "/sys/fs/bpf"
 #define MAP_ADD 0
@@ -39,14 +47,13 @@ int update_map(int mapfd, int action, void *key, void *value,
     return EXIT_OK;
 }
 
-void *lookup_map(int mapfd, void *key, char *map_name) {
-    void *elem;
-    int ret = bpf_map_lookup_elem(mapfd, key, elem);
+int lookup_map(int mapfd, void *key, void *value, char *map_name) {
+    int ret = bpf_map_lookup_elem(mapfd, key, value);
     if (ret != 0){
         fprintf(stderr, "ERR: lookup map %s, errno %d\n", map_name, errno);
-        return NULL;
+        return EXIT_FAIL_BPF;
     }
-    return elem;
+    return EXIT_OK;
 }
 
 /************************** Parsing functions ****************************/
@@ -105,3 +112,36 @@ uint32_t parse_ipv4(char _ipadr[]) {
     }
     return(addr);
 }
+
+char *get_tunnel_name(uint8_t tunnel) {
+    char *tunnel_name = NULL;
+    switch (tunnel)
+    {
+    case GENEVE:
+        tunnel_name = xstr(GENEVE);
+        break;
+    case VLAN:
+        tunnel_name = xstr(VLAN);
+        break;
+    case VXLAN:
+        tunnel_name = xstr(VXLAN);
+        break;
+    default:
+        tunnel_name = "UNKNOWN";
+        break;
+    }
+    return tunnel_name;
+}
+
+#define decode_ipv4(ip) ({           \
+    struct in_addr ip_addr;          \
+    ip_addr.s_addr = __bswap_32(ip); \
+    inet_ntoa(ip_addr);              \
+})
+
+#define decode_mac(mac) ({ \
+    char eth[18];               \
+    sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
+    eth;\
+})
+
