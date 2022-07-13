@@ -16,6 +16,7 @@
 #define PIN_BASE_DIR "/sys/fs/bpf"
 #define MAP_ADD 0
 #define MAP_DELETE 1
+#define MAP_GET 3
 
 /* Calls bpf update/delete elem based on the action. */
 int update_map(int mapfd, int action, void *key, void *value,
@@ -31,11 +32,21 @@ int update_map(int mapfd, int action, void *key, void *value,
         ret = bpf_map_update_elem(mapfd, key, value, flags);
         break;
     }
-    if(ret != 0){
+    if (ret != 0){
         fprintf(stderr, "ERR: updating map %s, errno %d\n", map_name, errno);
         return EXIT_FAIL_BPF;
     }
     return EXIT_OK;
+}
+
+void *lookup_map(int mapfd, void *key, char *map_name) {
+    void *elem;
+    int ret = bpf_map_lookup_elem(mapfd, key, elem);
+    if (ret != 0){
+        fprintf(stderr, "ERR: lookup map %s, errno %d\n", map_name, errno);
+        return NULL;
+    }
+    return elem;
 }
 
 /************************** Parsing functions ****************************/

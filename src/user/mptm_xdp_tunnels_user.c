@@ -9,9 +9,13 @@
 #include <locale.h>
 #include <unistd.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #include <kernel/lib/headers.h>
 #include <user/lib/bpf-user-helpers.h>
+
+#define str(x)  #x
+#define xstr(x) str(x)
 
  /* custom ones from xdp examples */
 #include <common/xdp_stats_kern_user.h>
@@ -29,7 +33,6 @@ typedef struct mptm_arguments {
     u_int16_t flags;
     u_int16_t source_port;
     u_int16_t redirect_iface;
-    char inner_source_addr[16];
     char source_addr[16];
     char dest_addr[16];
     char source_mac[18];
@@ -38,6 +41,7 @@ typedef struct mptm_arguments {
     u_int8_t debug;
     u_int8_t tunnel;
     u_int8_t redirect;
+    char key[16];
 } mptm_args;
 
 void  print_usage() {
@@ -59,8 +63,8 @@ void  print_usage() {
          "\t\t -R/--redirect_iface <dev-num>\n"
          "\t\t -f/--flags <0>\n"
          "\t\t -v/--verbose <1 or 0>\n"
-         "\t\t -a/--action [ADD/DEL] rule\n"
-         "\t\t -k/--key inner source addr for now\n"
+         "\t\t -a/--action [ADD/DEL/GET] rule\n"
+         "\t\t -k/--key (inner source addr for now)\n"
         );
 }
 
@@ -87,6 +91,14 @@ static const struct option long_options[] = {
 // TODO: Make it verify redirect etc separately and tunnels separately
 int verify_args(mptm_args *mptm) {
     int action = mptm->action;
+
+    if (action == MAP_GET || action == MAP_DELETE) {
+        if (mptm->key[0] == '\0') {
+            fprintf(stderr, "ERR: for this operation key is needed\n");
+            return -1;
+        }
+        return 0;
+    }
 
     switch (mptm->tunnel)
     {
@@ -125,7 +137,6 @@ int verify_args(mptm_args *mptm) {
     return 0;
 }
 
-// Make it support tunnel names VLAN/GENEVE etc
 // Change name of verbose to logs (-l/--enable_logs)
 int parse_params(int argc, char *argv[], mptm_args *mptm) {
     int opt = 0;
@@ -143,13 +154,22 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
                 mptm->action = MAP_ADD;
             } else if(strcmp(optarg, "DEL") == 0) {
                 mptm->action = MAP_DELETE;
+            } else if(strcmp(optarg, "GET") == 0) {
+                mptm->action = MAP_GET;
             } else {
                 fprintf(stderr, "ERR: INVALID value for option -o %s\n", optarg);
                 return -1;
             }
             break;
         case 't' :
-            mptm->tunnel = atoi(optarg);
+            if(strcmp(optarg, "VLAN") == 0) {
+                mptm->tunnel = VLAN;
+            } else if(strcmp(optarg, "GENEVE") == 0) {
+                mptm->tunnel = GENEVE;
+            } else {
+                fprintf(stderr, "ERR: INVALID value for tunnel -t %s\n", optarg);
+                return -1;
+            }
             break;
         case 'v' : mptm->vlid = atol(optarg);
             break;
@@ -175,7 +195,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
             break;
         case 'V' : mptm->debug = atoi(optarg);
             break;
-        case 'k' : strncpy(mptm->inner_source_addr, optarg, 16);
+        case 'k' : strncpy(mptm->key, optarg, 16);
             break;
         default:
             fprintf(stderr, "ERR: INVALID parameter supplied %c\n", opt);
@@ -237,6 +257,69 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
      return tn;
 }
 
+char *get_tunnel_name(uint8_t tunnel) {
+    char *tunnel_name = NULL;
+    switch (tn->tunnel)
+    {
+    case GENEVE:
+        *tunnel_name = xstr(GENEVE);
+        break;
+    case VLAN:
+        *tunnel_name = xstr(VLAN);
+        break;
+    case VXLAN:
+        *tunnel_name = xstr(VXLAN);
+        break;
+    default:
+        *tunnel_name = "UNKNOWN";
+        break;
+    }
+    return tunnel_name;
+}
+
+char *decode_ipv4(uint32_t ip) {
+    struct in_addr ip_addr;
+    ip_addr.s_addr = ip;
+    return inet_ntoa(ip_addr);
+}
+
+#define decode_mac(mac, eth) ({ \
+    char eth[18];               \
+    sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
+    eth;\
+})
+
+void dump_tunnel_info(mptm_tunnel_info *tn) {
+    printf("Tunnel info element - {\n");
+    printf("debug = %u\n", tn->debug);
+    printf("redirect = %u\n", tn->redirect);
+    printf("redirect_if = %u\n", tn->redirect_if);
+    printf("flags = %u\n", tn->flags);
+    printf("tunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
+    switch (tn->tunnel_type)
+    {
+    case VLAN: {
+        struct vlan_info *vlan = (struct vlan_info *)(&tn->tnl_info.vlan);
+        printf("vlan_id = %u\n", vlan->vlan_id);
+    }
+    break;
+    case GENEVE: {
+        struct geneve_info *geneve = (struct geneve_info *)(&tn->tnl_info.geneve);
+        printf("vlan_id = %u\n",geneve->vlan_id);
+        printf("source_port = %u\n",geneve->source_port);
+        printf("source_mac = %s\n",decode_mac(geneve->source_mac));
+        printf("outer_dest_mac = %s\n", decode_mac(geneve->dest_mac));
+        printf("inner_dest_mac = %s\n", decode_mac(geneve->inner_dest_mac));
+        printf("dest_addr = %s\n", decode_ipv4(geneve->dest_addr));
+        printf("source_addr = %s\n", decode_ipv4(geneve->source_addr));
+    }
+    break;
+    default:
+        break;
+    }
+    printf("}\n");
+}
+
 int main(int argc, char **argv) {
 
     mptm_args *mptm = (mptm_args *)malloc(sizeof(mptm_args));
@@ -256,23 +339,37 @@ int main(int argc, char **argv) {
 
     fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, TUNNEL_IFACE_MAP);
 
-    mptm_tunnel_info *ti = NULL;
-    if (mptm->action == MAP_ADD) {
-        fprintf(stdout, "Creating tunnel info object......");
+    uint32_t key = parse_ipv4(mptm->key);
+    fprintf(stdout, "Key (source ip) is %d\n", key);
 
+    int ret = EXIT_OK;
+
+    switch (mptm->action)
+    {
+    case MAP_GET: {
+        void *elem = (void *)lookup_map(tunnel_map_fd, &key, TUNNEL_IFACE_MAP);
+        mptm_tunnel_info *ti = (mptm_tunnel_info *)elem;
+        dump_tunnel_info(ti);
+        break;
+    }
+    case MAP_ADD: {
+        mptm_tunnel_info *ti = NULL;
+        fprintf(stdout, "Creating tunnel info object......");
         ti = create_tun_info(mptm);
         if(ti == NULL) {
             fprintf(stderr, "ERR: failed creating struct\n");
             return EXIT_FAIL_OPTION;
         }
-
         fprintf(stdout, "created\n");
+        ret = update_map(tunnel_map_fd, MAP_ADD, &key, ti, 0, TUNNEL_IFACE_MAP);
+        break;
+    }
+    case MAP_DELETE:
+        ret = update_map(tunnel_map_fd, MAP_DELETE, &key, NULL, 0, TUNNEL_IFACE_MAP);
+        break;
     }
 
-    uint32_t key = parse_ipv4(mptm->inner_source_addr);
-    fprintf(stdout, "Key (source ip) is %d\n", key);
-
-    return update_map(tunnel_map_fd, mptm->action, &key, ti, 0, TUNNEL_IFACE_MAP);
+    return ret;
 }
 
 
