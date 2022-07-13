@@ -142,7 +142,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     int opt = 0;
     int long_index = 0;
 
-    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:V:k:", 
+    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:V:k:",
                                  long_options, &long_index )) != -1 ) {
       printf("opt: %c arg: %s \n", opt, optarg);
       switch (opt) {

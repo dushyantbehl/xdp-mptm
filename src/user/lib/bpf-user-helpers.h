@@ -88,7 +88,7 @@ uint32_t parse_ipv4(char _ipadr[]) {
     uint32_t addr = 0, val;
 
     // Make a copy of the string before breaking it down
-    strlcpy(ipadr, _ipadr, 16);
+    strncpy(ipadr, _ipadr, 16);
 
     char *tok = strtok(ipadr,".");
     for (int i=0; i<4; i++) {
