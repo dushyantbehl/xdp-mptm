@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
 DEPS	     := ./deps
 
-MPTM_DEBUG   := n
+export MPTM_DEBUG   := n
 
 SRC_DIR ?= src
 USER_SRC_DIR ?= ${SRC_DIR}/user
@@ -14,6 +14,7 @@ USER_LIBS    := -lbpf -lm
 
 $(info XDP_TARGETS is [${XDP_TARGETS}])
 $(info USER_TARGETS is [${USER_TARGETS}])
+$(info MPTM_DEBUG is [${MPTM_DEBUG}])
 
 LIBBPF_DIR  = ${DEPS}/libbpf/src
 COMMON_DIR  = ${DEPS}/common

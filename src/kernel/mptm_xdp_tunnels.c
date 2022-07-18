@@ -25,11 +25,6 @@ struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
     .max_entries = MAX_ENTRIES,
 };
 
-/* Move to a common function and then multiplex the code */
-
-/* TODO: these functions have a lot of overlap
- * maybe move common stuff to a header
- */
 SEC("mptm_xdp_push")
 int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
