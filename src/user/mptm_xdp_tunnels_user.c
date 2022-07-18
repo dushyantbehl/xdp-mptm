@@ -19,9 +19,6 @@
 // TODO: make sure this can be overridden using env or argument
 #define TUNNEL_IFACE_MAP   "mptm_tunnels_map"
 
-// TODO: VLAN also needs dest_addr as an argument.
-// Key is supposed to be dest_addr so do we overload it or do something else with it?
-
 typedef struct mptm_arguments {
     int action;
     u_int32_t capture_iface;
@@ -58,27 +55,27 @@ void  print_usage() {
          "\t\t -r/--redirect <1 or 0>\n"
          "\t\t -R/--redirect_iface <dev-num>\n"
          "\t\t -f/--flags <0>\n"
-         "\t\t -v/--verbose <1 or 0>\n"
+         "\t\t -l/--enable_logs <1 or 0>\n"
          "\t\t -a/--action [ADD/DEL/GET] rule\n"
          "\t\t -k/--key (inner source addr for now)\n"
         );
 }
 
 static const struct option long_options[] = {
-        {"help",           no_argument,       0,    'h'},
-        {"action",         required_argument, 0,    'a'},
-        {"vlid",           required_argument, 0,    'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
-        {"flags",          required_argument, 0,    'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
-        {"source_port",    required_argument, 0,    'p'}, //"Source Port of <connection>", "<port>", true},
-        {"ingress_iface",  required_argument, 0,    'I'}, //"Iface index capture <dev>", "<ifidx>", true},
+        {"help",           no_argument,       -1,   'h'},
+        {"action",         required_argument, NULL, 'a'},
+        {"vlid",           required_argument, -1,   'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
+        {"flags",          required_argument, -1,   'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
+        {"source_port",    required_argument, -1,   'p'}, //"Source Port of <connection>", "<port>", true},
+        {"ingress_iface",  required_argument, -1,   'I'}, //"Iface index capture <dev>", "<ifidx>", true},
         {"redirect",       required_argument, 0,    'r'}, // to redirect packet to redirect_iface or not
-        {"redirect_iface", required_argument, 0,    'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
+        {"redirect_iface", required_argument, -1,   'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
         {"source_ip",      required_argument, NULL, 's'}, //"Source IP address of <dev>", "<ip>", true},
         {"source_mac",     required_argument, NULL, 'S'}, //"Source MAC addr of <dev>", "<mac>", true},
         {"dest_ip",        required_argument, NULL, 'd'}, //"Destination IP addr of <redirect-dev>", "<ip>", true},
         {"dest_mac",       required_argument, NULL, 'D'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
         {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
-        {"verbose",        required_argument, NULL, 'V'},
+        {"enable_logs",    required_argument, 0,    'l'},
         {"tunnel",         required_argument, NULL, 't'},
         {"key",            required_argument, NULL, 'k'},
         {0, 0, NULL, 0}
@@ -88,40 +85,39 @@ static const struct option long_options[] = {
 int verify_args(mptm_args *mptm) {
     int action = mptm->action;
 
+    // Key is always needed.
+    if (mptm->key[0] == '\0') {
+        fprintf(stderr, "ERR: key is not provided\n");
+        return -1;
+    }
+
     if (action == MAP_GET || action == MAP_DELETE) {
-        if (mptm->key[0] == '\0') {
-            fprintf(stderr, "ERR: for this operation key is needed\n");
+        goto out;
+    }
+
+    if (mptm->redirect == 1) {
+        if (mptm->redirect_iface == -1) {
+            fprintf(stderr, "ERR: redirect is set but redirect_iface is not provided\n");
             return -1;
         }
-        return 0;
     }
 
     switch (mptm->tunnel)
     {
     case GENEVE:
-        if(action == MAP_ADD) {
-            // currently we don't check vlanid and flags as they can be zero
-            if (mptm->capture_iface == 0 || // mptm->vlid == 0 || mptm->flags == 0 || mptm->redirect_iface == 0 ||
-                mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0' ||
-                mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac[0] == '\0') {
-                // if we need to add then we need all the other info to create
-                // tunnel structure.
-                fprintf(stderr, "ERR: operation is add but all argumnets are not provided\n");
-                return -1;
-            }
-        } else if(mptm->dest_addr[0] == '\0') {
-            // for delete we only need key.
-            fprintf(stderr, "ERR: operation is delete but key (-c) is not provided\n");
-            return 1;
+        if (mptm->vlid == -1 || mptm->flags == -1 || mptm->source_port == -1 ||
+            mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0' ||
+            mptm->outer_dest_mac[0] == '\0' || mptm->source_mac[0] == '\0' || mptm->inner_dest_mac[0] == '\0') {
+            // if we need to add then we need all the other info to create
+            // tunnel structure.
+            fprintf(stderr, "ERR: operation is add but all argumnets are not provided\n");
+            return -1;
         }
       break;
     case VLAN:
-        if (action == MAP_ADD) {
-            // currently we don't check vlanid as it can be zero
-        } else if(mptm->dest_addr[0] == '\0') {
-            // for delete we only need key.
-            fprintf(stderr, "ERR: operation is delete but key (-c) is not provided\n");
-            return 1;
+        if (mptm->vlid == -1) {
+            fprintf(stderr, "ERR: operation is add but all argumnets are not provided\n");
+            return -1;
         }
       break;
     default:
@@ -129,6 +125,7 @@ int verify_args(mptm_args *mptm) {
         return 1;
     }
 
+out:
     fprintf(stdout, "Arguments verified\n");
     return 0;
 }
@@ -138,7 +135,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     int opt = 0;
     int long_index = 0;
 
-    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:V:k:",
+    while( (opt = getopt_long(argc, argv, "h:a:t:v:f:p:I:R:s:S:d:D:M:l:k:",
                                  long_options, &long_index )) != -1 ) {
       printf("opt: %c arg: %s \n", opt, optarg);
       switch (opt) {
@@ -189,7 +186,7 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
             break;
         case 'M' : strncpy(mptm->inner_dest_mac, optarg, 18);
             break;
-        case 'V' : mptm->debug = atoi(optarg);
+        case 'l' : mptm->debug = atoi(optarg);
             break;
         case 'k' : strncpy(mptm->key, optarg, 16);
             break;
@@ -254,7 +251,6 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
 }
 
 void dump_tunnel_info(mptm_tunnel_info *tn) {
-
     if (tn == NULL) {
         return;
     }
@@ -262,7 +258,7 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("Tunnel info element - {\n");
     printf("\tdebug = %u\n", tn->debug);
     printf("\tredirect = %u\n", tn->redirect);
-    printf("\tredirect_if = %u\n", tn->redirect_if);
+    printf("\tredirect_iface = %u\n", tn->redirect_if);
     printf("\tflags = %u\n", tn->flags);
     printf("\ttunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
     switch (tn->tunnel_type)
@@ -274,9 +270,9 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     break;
     case GENEVE: {
         struct geneve_info *geneve = (struct geneve_info *)(&tn->tnl_info.geneve);
-        printf("\tvlan_id = %llu\n",geneve->vlan_id);
-        printf("\tsource_port = %u\n",geneve->source_port);
-        printf("\tsource_mac = %s\n",decode_mac(geneve->source_mac));
+        printf("\tvlan_id = %llu\n", geneve->vlan_id);
+        printf("\tsource_port = %u\n", geneve->source_port);
+        printf("\tsource_mac = %s\n", decode_mac(geneve->source_mac));
         printf("\touter_dest_mac = %s\n", decode_mac(geneve->dest_mac));
         printf("\tinner_dest_mac = %s\n", decode_mac(geneve->inner_dest_mac));
         printf("\tdest_addr = %s\n", decode_ipv4(geneve->dest_addr));
@@ -284,6 +280,7 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     }
     break;
     default:
+        printf("Unknown tunnel type %d\n", tn->tunnel_type);
         break;
     }
     printf("}\n");

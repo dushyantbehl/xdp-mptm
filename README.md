@@ -32,9 +32,8 @@ We provide 2 files to setup system according to the architecture above
 
 Load the bpf programs
 ```
-$ cd build/
-$ bpftool prog loadall mptm_xdp_tunnels.o /sys/fs/bpf/mptm_xdp_tunnels type xdp -d
-$ bpftool prog loadall xdp_redirect.o /sys/fs/bpf/xdp-redirect type xdp -d
+$ bpftool prog loadall build/mptm_xdp_tunnels.o /sys/fs/bpf/mptm_xdp_tunnels type xdp -d
+$ bpftool prog loadall build/mptm_xdp_redirect.o /sys/fs/bpf/mptm_xdp_redirect type xdp -d
 $ ls /sys/fs/bpf/
 mptm_xdp_tunnels  xdp-redirect
 $ bpftool prog show
@@ -56,7 +55,7 @@ Attach to the interfaces ingress
 
 ```
 $ bpftool net attach xdp id 299 dev veth-node1 overwrite
-$ bpftool net attach xdp id 110 dev geneve0 overwrite
+$ bpftool net attach xdp id 110 dev geneve1 overwrite
 ```
 
 ## Programming the maps
@@ -102,7 +101,8 @@ first time you run `make`.
 The command is run as,
 
 ```
-$ ./mptm_xdp_tunnels_user --verbose 1 --redirect 0 --flags 0 --tunnel 3 --vlid 0 --source_port 51234 --ingress_iface 48 --source_ip 10.200.1.100 --source_mac 76:42:54:45:13:b0  --dest_ip 10.20.20.2 --dest_mac b8:ce:f6:27:93:39 --inner_dest_mac c2:92:e5:ab:9d:88 -a ADD
+$ ./mptm_xdp_tunnels_user --verbose 0 --redirect 1 --redirect_iface 9 --flags 0 --tunnel GENEVE --vlid 0 --source_port 51234 --source_ip 10.20.20.1 --source_mac b8:ce:f6:27:96:69  --dest_ip 10.20.20.2 --dest_mac b8:ce:f6:27:93:39 --inner_dest_mac c2:92:e5:ab:9d:88 --key 10.200.1.100 -a ADD
+
 opt: V arg: 1 
 opt: r arg: 0 
 opt: f arg: 0 
