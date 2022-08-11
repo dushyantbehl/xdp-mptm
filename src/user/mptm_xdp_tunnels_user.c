@@ -62,20 +62,20 @@ void  print_usage() {
 }
 
 static const struct option long_options[] = {
-        {"help",           no_argument,       -1,   'h'},
+        {"help",           no_argument,       NULL, 'h'},
         {"action",         required_argument, NULL, 'a'},
-        {"vlid",           required_argument, -1,   'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
-        {"flags",          required_argument, -1,   'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
-        {"source_port",    required_argument, -1,   'p'}, //"Source Port of <connection>", "<port>", true},
-        {"ingress_iface",  required_argument, -1,   'I'}, //"Iface index capture <dev>", "<ifidx>", true},
-        {"redirect",       required_argument, 0,    'r'}, // to redirect packet to redirect_iface or not
-        {"redirect_iface", required_argument, -1,   'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
+        {"enable_logs",    optional_argument, NULL, 'l'},
+        {"ingress_iface",  optional_argument, NULL, 'I'}, //"Iface index capture <dev>", "<ifidx>", true},
+        {"redirect",       optional_argument, NULL, 'r'}, // to redirect packet to redirect_iface or not
+        {"redirect_iface", optional_argument, NULL, 'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
+        {"vlid",           required_argument, NULL, 'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
+        {"flags",          required_argument, NULL, 'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
+        {"source_port",    required_argument, NULL, 'p'}, //"Source Port of <connection>", "<port>", true},
         {"source_ip",      required_argument, NULL, 's'}, //"Source IP address of <dev>", "<ip>", true},
         {"source_mac",     required_argument, NULL, 'S'}, //"Source MAC addr of <dev>", "<mac>", true},
         {"dest_ip",        required_argument, NULL, 'd'}, //"Destination IP addr of <redirect-dev>", "<ip>", true},
         {"dest_mac",       required_argument, NULL, 'D'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
         {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
-        {"enable_logs",    required_argument, 0,    'l'},
         {"tunnel",         required_argument, NULL, 't'},
         {"key",            required_argument, NULL, 'k'},
         {0, 0, NULL, 0}
@@ -164,17 +164,47 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
                 return -1;
             }
             break;
-        case 'v' : mptm->vlid = atol(optarg);
+        case 'v' : 
+            if (!optarg) {
+                mptm->vlid = -1;
+                break;
+            }
+            mptm->vlid = atol(optarg);
             break;
-        case 'f' : mptm->flags = atoi(optarg);
+        case 'f' : 
+            if (!optarg) {
+                mptm->flags = -1;
+                break;
+            }
+            mptm->flags = atoi(optarg);
             break;
-        case 'p' : mptm->source_port = atoi(optarg); 
+        case 'p' :
+            if (!optarg) {
+                mptm->source_port = -1;
+                break;
+            }
+            mptm->source_port = atoi(optarg); 
             break;
-        case 'I' : mptm->capture_iface = atoi(optarg);
+        case 'I' : 
+            if (!optarg) {
+                mptm->capture_iface = -1;
+                break;
+            }
+            mptm->capture_iface = atoi(optarg);
             break;
-        case 'r' : mptm->redirect = atoi(optarg);
+        case 'r' :
+            if (!optarg) {
+                mptm->redirect = 0;
+                break;
+            }
+            mptm->redirect = atoi(optarg);
             break;
-        case 'R' : mptm->redirect_iface = atoi(optarg);
+        case 'R' :
+            if (!optarg) {
+                mptm->redirect_iface = 0;
+                break;
+            }
+            mptm->redirect_iface = atoi(optarg);
             break;
         case 's' : strncpy(mptm->source_addr, optarg, 16);
             break;
@@ -186,7 +216,12 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
             break;
         case 'M' : strncpy(mptm->inner_dest_mac, optarg, 18);
             break;
-        case 'l' : mptm->debug = atoi(optarg);
+        case 'l' :
+            if (!optarg) {
+                mptm->debug = 0;
+                break;
+            }
+            mptm->debug = atoi(optarg);
             break;
         case 'k' : strncpy(mptm->key, optarg, 16);
             break;
