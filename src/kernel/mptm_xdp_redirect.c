@@ -6,27 +6,19 @@
 
 #define MAX_ENTRIES 30
 
-struct bpf_map_def SEC("maps") mptm_redirect_map = {
-    .type        = BPF_MAP_TYPE_HASH,
-    .key_size    = sizeof(__u32),
-    .value_size  = sizeof(__u32),
+struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
+    .type        = BPF_MAP_TYPE_DEVMAP,
+    .key_size    = sizeof(int),
+    .value_size  = sizeof(int),
     .max_entries = MAX_ENTRIES,
 };
 
-SEC("mptm_xdp_redirect")
+SEC("mptm_devmap_redirect")
 int  xdp_prog_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
-    __u32 *val = bpf_map_lookup_elem(&mptm_redirect_map, &key);
 
-    if(val == NULL){
-      mptm_print("[ERR] map entry missing for iface %d\n", key);
-      return XDP_PASS;
-    }
-
-    mptm_print("redirecting packet from  %d -> %d\n", key, *val);
-
-    return bpf_redirect(*val, flags);
+    return bpf_redirect_map(&mpatm_redirect_devmap, key, flags);
 }
 
 char _license[] SEC("license") = "GPL";
