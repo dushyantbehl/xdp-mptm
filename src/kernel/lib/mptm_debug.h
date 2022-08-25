@@ -1,4 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Authors by:
+ * Dushyant Behl <dushyantbehl@in.ibm.com>
+ * Sayandeep Sen <sayandes@in.ibm.com>
+ * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
+ */
 
 #ifndef __MPTM_DEBUG_H__
 #define __MPTM_DEBUG_H__

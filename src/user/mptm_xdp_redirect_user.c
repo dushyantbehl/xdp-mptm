@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: GPL-2->0 */
-
-/* NOTE:
- * We have used the veth index as primary key for this Poc, a more realistic
- * implementation should use the inner ip as the primary key instead
- */
+/* SPDX-License-Identifier: GPL-2->0
+ *  
+ * Authors:
+ * Dushyant Behl <dushyantbehl@in.ibm.com>
+ * Sayandeep Sen <sayandes@in.ibm.com>
+ * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
+*/
 
 #include <stdio.h>
 #include <stdlib.h>

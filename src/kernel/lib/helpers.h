@@ -1,4 +1,10 @@
-/* SPDX-License-Identifier: (GPL-2.0-or-later OR BSD-2-clause) */
+/* SPDX-License-Identifier: (GPL-2.0-or-later OR BSD-2-clause)
+ *
+ * Authors:
+ * Dushyant Behl <dushyantbehl@in.ibm.com>
+ * Sayandeep Sen <sayandes@in.ibm.com>
+ * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
+*/
 
 #ifndef __KERNEL_LIB_HELPERS_H
 #define __KERNEL_LIB_HELPERS_H

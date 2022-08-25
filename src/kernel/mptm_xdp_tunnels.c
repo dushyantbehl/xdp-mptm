@@ -1,4 +1,11 @@
-/* SPDX-License-Identifier: GPL-2->0 */
+/* SPDX-License-Identifier: GPL-2->0 
+ *  
+ * Authors:
+ * Dushyant Behl <dushyantbehl@in.ibm.com>
+ * Sayandeep Sen <sayandes@in.ibm.com>
+ * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
+ */
+
 
 #include <linux/bpf.h>
 #include <linux/in.h>
@@ -6,7 +13,6 @@
 #include <linux/if_ether.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-//#include <iproute2/bpf_elf.h>
 
 #include <common/parsing_helpers.h>
 

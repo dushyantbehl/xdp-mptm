@@ -1,4 +1,10 @@
-/* SPDX-License-Identifier: (GPL-2.0-or-later OR BSD-2-clause) */
+/* SPDX-License-Identifier: (GPL-2.0-or-later OR BSD-2-clause)
+ *  
+ * Authors:
+ * Dushyant Behl <dushyantbehl@in.ibm.com>
+ * Sayandeep Sen <sayandes@in.ibm.com>
+ * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
+ */
 
 #ifndef __GENEVE_HELPERS_H
 #define __GENEVE_HELPERS_H
@@ -87,7 +93,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
         return XDP_ABORTED;
     }
 
-    //TODO: IRL Read from arp map table
+    //TODO: Read from arp map table
     set_dst_mac(data, tn->inner_dest_mac);
 
     int outer_hdr_size =
@@ -153,7 +159,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     ip->check = c_sum;
 
     //TODO: Put right checksum.
-    //IRL: For now Make check 0
+    //For now make check 0
     udp->check = 0;
     udp->source = bpf_htons(tn->source_port); // TODO: a hash value based on inner IP packet
     udp->dest = GEN_DSTPORT;
@@ -172,7 +178,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     geneve->critical = 0;
     geneve->proto_type = bpf_htons(ETH_P_TEB);
 
-    //TODO: IRL make vni paramater
+    //TODO: make vni paramater
     //trn_tunnel_id_to_vni(tn->vlid, pkt->geneve->vni);
 
     geneve->vni[0] = (__u8)(tn->vlan_id >> 16);
