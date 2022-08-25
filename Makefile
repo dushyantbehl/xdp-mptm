@@ -6,6 +6,7 @@
 # Sayandeep Sen <sayandes@in.ibm.com>
 # Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
 #
+# Currently we use the make framework of xdp-tutorials/common 
 DEPS	     := ./deps
 
 export MPTM_DEBUG   := n
