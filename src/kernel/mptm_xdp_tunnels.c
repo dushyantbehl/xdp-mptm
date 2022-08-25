@@ -58,6 +58,18 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     return xdp_stats_record_action(ctx, action);
 }
 
+SEC("mptm_xdp_pop")
+int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
+    int action = XDP_PASS;  //default action
+
+    // If packet is ENCAPSULATED
+    // Check packet tunnel - VLAN? GENEVE? VXLAN? ETC?
+    // check inner destination of packet
+    // use inner destination ip as the key in the tunnel iface map
+    // if present then do decap and send to the ingress interface present
+    // in the tunnel map
+}
+
 SEC("mptm_xdp_pass")
 int mptm_xdp_pass_func(struct xdp_md *ctx) {
     return XDP_PASS;

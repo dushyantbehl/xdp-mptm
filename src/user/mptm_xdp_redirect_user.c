@@ -18,7 +18,7 @@
 
 #include <user/lib/bpf-user-helpers.h>
 
-#define REDIRECT_MAP       "redirect_map"
+#define REDIRECT_DEVMAP       "redirect_devmap"
 
 int ingress_iface = -1;
 int action;
@@ -87,14 +87,14 @@ int main(int argc, char **argv) {
     }
 
     /* Make map for redirection port entries */
-    int redirect_map_fd = open_bpf_map_file(PIN_BASE_DIR, REDIRECT_MAP, NULL);
+    int redirect_map_fd = open_bpf_map_file(PIN_BASE_DIR, REDIRECT_DEVMAP, NULL);
     if (redirect_map_fd < 0) {
         fprintf(stderr, "ERR: opening redirect map\n");
         return EXIT_FAIL_BPF;
     }
     printf("ingress iface:%d, redirect iface:%d, action:%s\n",
-            redirect_iface, ingress_iface, action ? "DELETE" : "ADD" );
+            ingress_iface, redirect_iface, action ? "DELETE" : "ADD" );
 
     return update_map(redirect_map_fd, action, &ingress_iface,
-                      &redirect_iface, 0, REDIRECT_MAP);
+                      &redirect_iface, 0, REDIRECT_DEVMAP);
 }
