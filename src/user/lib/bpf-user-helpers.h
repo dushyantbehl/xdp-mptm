@@ -22,7 +22,7 @@
 #include <common/common_defines.h>
 #include <common/common_user_bpf_xdp.h>
 
-#include <kernel/lib/headers.h> 
+#include <kernel/lib/map-defs.h> 
 
 #define str(x)  #x
 #define xstr(x) str(x)

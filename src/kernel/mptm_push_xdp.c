@@ -77,6 +77,7 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     // use inner destination ip as the key in the tunnel iface map
     // if present then do decap and send to the ingress interface present
     // in the tunnel map
+    return action;
 }
 
 SEC("mptm_pass")

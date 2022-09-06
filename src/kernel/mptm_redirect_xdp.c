@@ -9,7 +9,7 @@
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 
-#include <kernel/lib/mptm_debug.h>
+#include <kernel/lib/mptm-debug.h>
 
 #define MAX_ENTRIES 30
 
@@ -25,7 +25,7 @@ int  xdp_prog_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
 
-    return bpf_redirect_map(&mpatm_redirect_devmap, key, flags);
+    return bpf_redirect_map(&mptm_redirect_devmap, key, flags);
 }
 
 char _license[] SEC("license") = "GPL";
