@@ -16,8 +16,10 @@
 
 #include <common/parsing_helpers.h>
 
-#include <kernel/lib/headers.h>
-#include <kernel/lib/helpers.h>
+#include <kernel/lib/pkt-parse.h>
+#include <kernel/lib/pkt-encap.h>
+#include <kernel/lib/geneve.h>
+#include <kernel/lib/map-defs.h>
 
 /* Defines xdp_stats_map */
 #include <common/xdp_stats_kern_user.h>
@@ -31,11 +33,12 @@ struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
     .max_entries = MAX_ENTRIES,
 };
 
-SEC("mptm_xdp_push")
+SEC("mptm_push")
 int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
     struct ethhdr *eth;
     mptm_tunnel_info* tn;
+    __u8 tun_type;
 
     /* Parse the ethhdr and tunnel info from ctx,
      * the key based lookup happens inside this function
@@ -44,17 +47,15 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
         goto out;
     }
 
-    switch (tn->tunnel_type)
-    {
-    case VLAN:
+    tun_type = tn->tunnel_type;
+    if (tun_type == VLAN) {
         action = trigger_vlan_push(ctx, eth, tn);
-        break;
-    case GENEVE:
+    }
+    else if (tun_type == GENEVE) {
         action = trigger_geneve_push(ctx, eth, tn);
-        break;
-    case NONE:
-    default:
-        break;
+    } else {
+        // Unknown tunnel type
+        goto out;
     }
 
     if (tn->redirect) {
@@ -64,9 +65,11 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     return xdp_stats_record_action(ctx, action);
 }
 
-SEC("mptm_xdp_pop")
+SEC("mptm_pop")
 int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
+
+
 
     // If packet is ENCAPSULATED
     // Check packet tunnel - VLAN? GENEVE? VXLAN? ETC?
@@ -76,7 +79,7 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     // in the tunnel map
 }
 
-SEC("mptm_xdp_pass")
+SEC("mptm_pass")
 int mptm_xdp_pass_func(struct xdp_md *ctx) {
     return XDP_PASS;
 }

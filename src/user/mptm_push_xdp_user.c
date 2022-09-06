@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#include <kernel/lib/headers.h>
+#include <kernel/lib/map-defs.h>
 #include <user/lib/bpf-user-helpers.h>
 
  /* custom ones from xdp examples */

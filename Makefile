@@ -15,7 +15,7 @@ SRC_DIR ?= src
 USER_SRC_DIR ?= ${SRC_DIR}/user
 KERNEL_SRC_DIR ?= ${SRC_DIR}/kernel
 
-XDP_PROGS    := mptm_xdp_tunnels mptm_xdp_redirect
+XDP_PROGS    := mptm_push_xdp mptm_redirect_xdp
 XDP_TARGETS  := ${XDP_PROGS:=.o}
 USER_TARGETS := ${XDP_PROGS:=_user}
 USER_LIBS    := -lbpf -lm

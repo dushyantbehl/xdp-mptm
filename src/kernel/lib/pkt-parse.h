@@ -6,8 +6,10 @@
  * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
 */
 
-#ifndef __KERNEL_LIB_HELPERS_H
-#define __KERNEL_LIB_HELPERS_H
+#ifndef __PKT_PARSE__
+#define __PKT_PARSE__
+
+#pragma once
 
 #include <stddef.h>
 #include <linux/if_ether.h>
@@ -19,11 +21,8 @@
 #include <linux/udp.h>
 #include <linux/tcp.h>
 
-#include <common/rewrite_helpers.h>
-
-#include <kernel/lib/headers.h>
-#include <kernel/lib/geneve.h>
-#include <kernel/lib/mptm_debug.h>
+#include <kernel/lib/map-defs.h>
+#include <kernel/lib/mptm-debug.h>
 
 extern struct bpf_map_def mptm_tunnel_iface_map;
 
@@ -73,26 +72,4 @@ static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
         return ret;
 }
 
-static __always_inline int trigger_geneve_push(struct xdp_md *ctx,
-                                               struct ethhdr *eth,
-                                               mptm_tunnel_info *tn) {
-     // typecast the union to geneve
-    struct geneve_info *geneve = (geneve_tunnel_info *)(&tn->tnl_info.geneve);
-    return geneve_tag_push(ctx, eth, geneve);
-}
-
-/* Use bpf.h function bpf_skb_vlan_push to remove dependency on xdp tutorials */
-static __always_inline int trigger_vlan_push(struct xdp_md *ctx,
-                                             struct ethhdr *eth,
-                                             mptm_tunnel_info *tn) {
-    // typecast the union to vlan
-    struct vlan_info *vlan = (vlan_tunnel_info *)(&tn->tnl_info.vlan);
-
-    if (vlan_tag_push(ctx, eth, vlan->vlan_id) != 0) {
-        mptm_print("[ERR] vlan tag push failed %d\n", vlan->vlan_id);
-        return XDP_ABORTED;
-    }
-    return XDP_PASS;
-}
-
-#endif /* __KERNEL_LIB_HELPERS_H */
+#endif /*  __PKT_PARSE__ */
