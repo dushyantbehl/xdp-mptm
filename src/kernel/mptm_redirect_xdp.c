@@ -14,13 +14,13 @@
 #define MAX_ENTRIES 30
 
 struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
-    .type        = BPF_MAP_TYPE_DEVMAP,
-    .key_size    = sizeof(int),
-    .value_size  = sizeof(int),
+    .type        = BPF_MAP_TYPE_DEVMAP_HASH,
+    .key_size    = sizeof(__u32),
+    .value_size  = sizeof(__u32),
     .max_entries = MAX_ENTRIES,
 };
 
-SEC("mptm_devmap_redirect")
+SEC("mptm_redirect")
 int  xdp_prog_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
@@ -28,4 +28,10 @@ int  xdp_prog_redirect(struct xdp_md *ctx) {
     return bpf_redirect_map(&mptm_redirect_devmap, key, flags);
 }
 
+SEC("mptm_pass")
+int mptm_xdp_pass_func(struct xdp_md *ctx) {
+    return XDP_PASS;
+}
+
 char _license[] SEC("license") = "GPL";
+
