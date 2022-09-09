@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     }
 
     /* Make map for redirection port entries */
-    int redirect_map_fd = open_bpf_map_file(PIN_BASE_DIR, REDIRECT_DEVMAP, NULL);
+    int redirect_map_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_DEVMAP);
     if (redirect_map_fd < 0) {
         fprintf(stderr, "ERR: opening redirect map\n");
         return EXIT_FAIL_BPF;

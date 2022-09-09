@@ -20,9 +20,6 @@
 #include <kernel/lib/map-defs.h>
 #include <user/lib/bpf-user-helpers.h>
 
- /* custom ones from xdp examples */
-#include <common/xdp_stats_kern_user.h>
-
 // TODO: make sure this can be overridden using env or argument
 #define TUNNEL_INFO_MAP   "mptm_tunnel_info_map"
 #define REDIRECT_INFO_MAP   "mptm_redirect_info_map"
@@ -407,7 +404,7 @@ int main(int argc, char **argv) {
     }
 
     /* Open the map for geneve config */
-    int tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_INFO_MAP, NULL);
+    int tunnel_map_fd = load_bpf_mapfile(PIN_BASE_DIR, TUNNEL_IFACE_MAP);
     if (tunnel_map_fd < 0) {
           fprintf(stderr, "ERR: cannot open tunnel iface map\n");
         return EXIT_FAIL_BPF;

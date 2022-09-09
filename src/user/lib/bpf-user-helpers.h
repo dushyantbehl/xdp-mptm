@@ -18,19 +18,50 @@
 
 #include <arpa/inet.h>
 #include <byteswap.h>
- 
-#include <common/common_defines.h>
-#include <common/common_user_bpf_xdp.h>
 
 #include <kernel/lib/map-defs.h> 
+                     
+/* Exit return codes */
+#define EXIT_OK 		 0 /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
+#define EXIT_FAIL		 1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
+#define EXIT_FAIL_OPTION	 2
+#define EXIT_FAIL_XDP		30
+#define EXIT_FAIL_BPF		40 
+
+/* map action codes */
+#define MAP_ADD 0
+#define MAP_DELETE 1
+#define MAP_GET 3     
 
 #define str(x)  #x
 #define xstr(x) str(x)
 
 #define PIN_BASE_DIR "/sys/fs/bpf"
-#define MAP_ADD 0
-#define MAP_DELETE 1
-#define MAP_GET 3
+
+#ifndef PATH_MAX
+#define PATH_MAX	4096
+#endif
+
+int load_bpf_mapfile(const char *dir, const char *mapname) {
+	char filename[PATH_MAX];
+	int len, fd;
+
+	len = snprintf(filename, PATH_MAX, "%s/%s", dir, mapname);
+	if (len < 0) {
+		fprintf(stderr, "ERR: constructing full mapname path\n");
+		return -1;
+	}
+
+	fd = bpf_obj_get(filename);
+	if (fd < 0) {
+		fprintf(stderr,
+			"WARN: Failed to open bpf map file:%s err(%d):%s\n",
+			filename, errno, strerror(errno));
+		return fd;
+	}
+
+	return fd;
+}
 
 /* Calls bpf update/delete elem based on the action. */
 int update_map(int mapfd, int action, void *key, void *value,
