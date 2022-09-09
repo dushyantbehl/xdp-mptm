@@ -141,7 +141,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //pkt->rts_opt = (void *)&pkt->geneve->options[0];
 
     // Populate the outer header fields 
-    ethcpy->h_proto = bpf_htons(ETH_P_IP);
+    ethcpy->h_proto = BE_ETH_P_IP;
     set_dst_mac(data, tn->dest_mac);
     set_src_mac(data, tn->source_mac);
     

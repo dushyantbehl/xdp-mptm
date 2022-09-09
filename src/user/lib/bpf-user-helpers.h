@@ -95,7 +95,7 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
   subnets bit shifted by 8.
   [10, 10, 1, 2] becomes 10100102
 */
-uint32_t parse_ipv4(char _ipadr[]) {
+uint32_t ipv4_to_int(char _ipadr[]) {
 
     char ipadr[16];
     uint32_t addr = 0, val;
@@ -139,6 +139,11 @@ char *get_tunnel_name(uint8_t tunnel) {
     return tunnel_name;
 }
 
+
+/*
+ * First convert to network byte order
+ * using __bswap_32 which inet_ntoa expects.
+ */
 #define decode_ipv4(ip) ({           \
     struct in_addr ip_addr;          \
     ip_addr.s_addr = __bswap_32(ip); \
@@ -150,4 +155,3 @@ char *get_tunnel_name(uint8_t tunnel) {
     sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
     eth;\
 })
-

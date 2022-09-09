@@ -9,25 +9,6 @@
 
 #include <linux/bpf.h>
 
-#ifndef __inline
-#define __inline inline __attribute__((always_inline))
-#endif
-
-#define __ALWAYS_INLINE__ __attribute__((__always_inline__))
-
-#ifndef __ALWAYS_INLINE__
-#define __ALWAYS_INLINE__ __attribute__((__always_inline__))
-#endif
-
-/* Taken from Katran.
- * ETH_P_IP and ETH_P_IPV6 in Big Endian format.
- * So we don't have to do htons on each packet
- */
-#define BE_ETH_P_IP 8
-#define BE_ETH_P_IPV6 56710
-
-/* structs used in bpf maps */
-
 enum mptm_tunnel_type {
     NONE = 0,
     VLAN = 1,
@@ -58,7 +39,6 @@ typedef struct tunnel_info {
     __u8 debug;
     __u8 tunnel_type;
     __u8 redirect;
-    __u16 redirect_if;
     __u16 flags;
     union {
         struct geneve_info geneve;
@@ -66,3 +46,8 @@ typedef struct tunnel_info {
         struct vlan_info vlan;
     } tnl_info __attribute__((aligned));
 } __attribute__((packed)) mptm_tunnel_info;
+
+typedef struct mptm_map_key {
+    __be32 s_addr;
+    __be32 d_addr;
+} __attribute__((packed)) mptm_key_t;

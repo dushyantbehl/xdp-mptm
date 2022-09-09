@@ -6,7 +6,6 @@
  * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
  */
 
-
 #include <linux/bpf.h>
 #include <linux/in.h>
 
@@ -25,26 +24,50 @@
 #include <common/xdp_stats_kern_user.h>
 #include <common/xdp_stats_kern.h>
 
-#define MAX_ENTRIES 30
-struct bpf_map_def SEC("maps") mptm_tunnel_iface_map = {
+#define MAX_ENTRIES 1024
+
+struct bpf_map_def SEC("maps") mptm_tunnel_info_map = {
     .type        = BPF_MAP_TYPE_HASH,
-    .key_size    = sizeof(__u32),
+    .key_size    = sizeof(__u64),
     .value_size  = sizeof(mptm_tunnel_info),
     .max_entries = MAX_ENTRIES,
+};
+
+/*
+    This map contains twice the entry because for egress from container
+    the entry src:node1->dst:node2 is set to eth0 but on ingress the
+    program xdp_pop looks at a pakcet src:node2->dst:node1 which has value
+    set to id of the veth device to redirect to the container.
+*/
+struct bpf_map_def SEC("maps") mptm_tunnel_redirect_map = {
+    .type        = BPF_MAP_TYPE_DEVMAP_HASH,
+    .key_size    = sizeof(__u64),
+    .value_size  = sizeof(__u32),
+    .max_entries = MAX_ENTRIES*2,
 };
 
 SEC("mptm_push")
 int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
     struct ethhdr *eth;
-    mptm_tunnel_info* tn;
+    struct iphdr *ip;
+    struct tunnel_info* tn;
+    mptm_key_t key;
     __u8 tun_type;
 
-    /* Parse the ethhdr and tunnel info from ctx,
-     * the key based lookup happens inside this function
-     */
-    if (parse_tunnel_info(ctx, &eth, &tn) != 0){
+    /* Parse the ethhdr and iphdr from ctx */
+    if (parse_pkt_headers(ctx, &eth, &ip) != 0){
         goto out;
+    }
+
+    /* Get the tunnel struct based on packet src and dest */
+    key.s_addr = ip->saddr;
+    key.d_addr = ip->daddr;
+
+    tn = = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
+    if(tn == NULL) {
+      mptm_print("[ERR] map entry missing for key %d\n", key);
+      goto out;
     }
 
     tun_type = tn->tunnel_type;
@@ -54,13 +77,15 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     else if (tun_type == GENEVE) {
         action = trigger_geneve_push(ctx, eth, tn);
     } else {
-        // Unknown tunnel type
+        bpf_debug("[ERR] tunnel type is unknown");
         goto out;
     }
 
     if (tn->redirect) {
-        action = bpf_redirect(tn->redirect_if, tn->flags);
+        __u64 flags = 0; // keep redirect flags zero for now
+        action = bpf_redirect_map(&mptm_tunnel_redirect_map, &key, flags);
     }
+
   out:
     return xdp_stats_record_action(ctx, action);
 }
@@ -69,20 +94,15 @@ SEC("mptm_pop")
 int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
 
-
-
     // If packet is ENCAPSULATED
     // Check packet tunnel - VLAN? GENEVE? VXLAN? ETC?
     // check inner destination of packet
     // use inner destination ip as the key in the tunnel iface map
     // if present then do decap and send to the ingress interface present
     // in the tunnel map
-    return action;
-}
 
-SEC("mptm_pass")
-int mptm_xdp_pass_func(struct xdp_md *ctx) {
-    return XDP_PASS;
+  out:
+    return xdp_stats_record_action(ctx, action);
 }
 
 char _license[] SEC("license") = "GPL";

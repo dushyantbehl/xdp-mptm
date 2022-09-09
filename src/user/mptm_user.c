@@ -24,15 +24,18 @@
 #include <common/xdp_stats_kern_user.h>
 
 // TODO: make sure this can be overridden using env or argument
-#define TUNNEL_IFACE_MAP   "mptm_tunnels_map"
+#define TUNNEL_INFO_MAP   "mptm_tunnel_info_map"
+#define REDIRECT_INFO_MAP   "mptm_redirect_info_map"
+
 
 typedef struct mptm_arguments {
     int action;
-    u_int32_t capture_iface;
     u_int64_t vlid;
     u_int16_t flags;
     u_int16_t source_port;
-    u_int16_t redirect_iface;
+    u_int16_t vpeer_iface;
+    u_int16_t veth_iface;
+    u_int16_t eth0_iface;
     char source_addr[16];
     char dest_addr[16];
     char source_mac[18];
@@ -60,11 +63,12 @@ void  print_usage() {
          "\t\t -M/--inner_dest_mac <inner-dest-mac e.g. aa:bb:cc:dd:ee:ff>\n"
          "\t common options:-\n"
          "\t\t -r/--redirect <1 or 0>\n"
-         "\t\t -R/--redirect_iface <dev-num>\n"
+         "\t\t -L/--vpeer_iface <dev-num>\n"
+         "\t\t -M/--veth_iface <dev-num>\n"
+         "\t\t -N/--eth0_iface <dev-num>\n"
          "\t\t -f/--flags <0>\n"
          "\t\t -l/--enable_logs <1 or 0>\n"
          "\t\t -a/--action [ADD/DEL/GET] rule\n"
-         "\t\t -k/--key (inner source addr for now)\n"
         );
 }
 
@@ -72,9 +76,10 @@ static const struct option long_options[] = {
         {"help",           no_argument,       NULL, 'h'},
         {"action",         required_argument, NULL, 'a'},
         {"enable_logs",    optional_argument, NULL, 'l'},
-        {"ingress_iface",  optional_argument, NULL, 'I'}, //"Iface index capture <dev>", "<ifidx>", true},
-        {"redirect",       optional_argument, NULL, 'r'}, // to redirect packet to redirect_iface or not
-        {"redirect_iface", optional_argument, NULL, 'R'}, //"Iface id redirect <dev>[eth0]", "<ifidx>", true},
+        {"redirect",       optional_argument, NULL, 'r'}, // to redirect egress packet to eth0 iface or not
+        {"vpeer_iface",    optional_argument, NULL, 'X'}, //"Iface id vpeer device <dev>[eth0]", "<ifidx>", true},
+        {"veth_iface",     optional_argument, NULL, 'Y'}, //"Iface id veth device <dev>[eth0]", "<ifidx>", true},
+        {"eth0_iface",     optional_argument, NULL, 'Z'}, //"Iface id eth0 device <dev>[eth0]", "<ifidx>", true},
         {"vlid",           required_argument, NULL, 'v'}, //"Geneve tunnel vlan id of <connection>", "<vlid>", true},
         {"flags",          required_argument, NULL, 'f'}, //"Geneve tunnel flags of <connection>", "<flags>", true},
         {"source_port",    required_argument, NULL, 'p'}, //"Source Port of <connection>", "<port>", true},
@@ -84,27 +89,31 @@ static const struct option long_options[] = {
         {"dest_mac",       required_argument, NULL, 'D'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
         {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
         {"tunnel",         required_argument, NULL, 't'},
-        {"key",            required_argument, NULL, 'k'},
         {0, 0, NULL, 0}
 };
 
-// TODO: Make it verify redirect etc separately and tunnels separately
+// TODO: refactor?
 int verify_args(mptm_args *mptm) {
     int action = mptm->action;
 
     // Key is always needed.
-    if (mptm->key[0] == '\0') {
-        fprintf(stderr, "ERR: key is not provided\n");
+    if (mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0') {
+        fprintf(stderr, "ERR: source_addr and dest_addr form the key and are not provided\n");
         return -1;
     }
 
     if (action == MAP_GET || action == MAP_DELETE) {
-        goto out;
+        goto verified;
+    }
+
+    if (mptm->veth_iface == -1 || mptm->vpeer_iface == -1) {
+        fprintf(stderr, "ERR: veth_iface and vpeer_iface are not provided\n");
+        return -1;
     }
 
     if (mptm->redirect == 1) {
-        if (mptm->redirect_iface == -1) {
-            fprintf(stderr, "ERR: redirect is set but redirect_iface is not provided\n");
+        if (mptm->eth0_iface == -1) {
+            fprintf(stderr, "ERR: redirect is set but eth0_iface is not provided\n");
             return -1;
         }
     }
@@ -129,10 +138,10 @@ int verify_args(mptm_args *mptm) {
       break;
     default:
         fprintf(stderr, "ERR: Unknown type of tunnel\n");
-        return 1;
+        return -1;
     }
 
-out:
+verified:
     fprintf(stdout, "Arguments verified\n");
     return 0;
 }
@@ -192,26 +201,30 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
             }
             mptm->source_port = atoi(optarg); 
             break;
-        case 'I' : 
+        case 'X' : 
             if (!optarg) {
-                mptm->capture_iface = -1;
+                mptm->vpeer_iface = 0;
                 break;
             }
-            mptm->capture_iface = atoi(optarg);
-            break;
+            mptm->vpeer_iface = atoi(optarg);
+        case 'Y' : 
+            if (!optarg) {
+                mptm->veth_iface = 0;
+                break;
+            }
+            mptm->veth_iface = atoi(optarg);
+        case 'Z' : 
+            if (!optarg) {
+                mptm->eth0_iface = 0;
+                break;
+            }
+            mptm->eth0_iface = atoi(optarg);
         case 'r' :
             if (!optarg) {
                 mptm->redirect = 0;
                 break;
             }
             mptm->redirect = atoi(optarg);
-            break;
-        case 'R' :
-            if (!optarg) {
-                mptm->redirect_iface = 0;
-                break;
-            }
-            mptm->redirect_iface = atoi(optarg);
             break;
         case 's' : strncpy(mptm->source_addr, optarg, 16);
             break;
@@ -241,6 +254,42 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     return verify_args(mptm);
 }
 
+
+/* Returns key or uint64_t (-1) on error */
+static inline uint64_t get_key(mptm_args *mptm, bool inverted) {
+    uint64_t key = 0;
+
+    struct in_addr saddr;
+    struct in_addr daddr;
+
+    /* 
+     * We need to convert them individually to network byte order format
+     * and then combine to form the key because in the xdp program
+     * key is constructed by using the saddr and daddr directly from
+     * the packet and hence saves us two bswaps on each packet.
+     */
+    if (inet_aton(mptm->source_addr, &saddr) != 1) {
+        fprintf(stderr, "ERR: failed to parse mptm source_addr");
+        return -1;
+    }
+
+    if (inet_aton(mptm->dest_addr, &daddr) != 1) {
+        fprintf(stderr, "ERR: failed to parse mptm dest_addr");
+        return -1;
+    }
+
+    uint64_t s_addr = saddr.s_addr;
+    uint64_t d_addr = daddr.s_addr;
+
+    if (inverted) {
+        key = d_addr<<32 + s_addr;
+    } else {
+        key = s_addr<<32 + d_addr;
+    }
+
+    return key;
+}
+
 mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
 
     mptm_tunnel_info *tn = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
@@ -248,7 +297,6 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
     tn->debug = mptm->debug;
     tn->tunnel_type = mptm->tunnel;
     tn->redirect = mptm->redirect;
-    tn->redirect_if = mptm->redirect_iface;
     tn->flags = mptm->flags;
 
     switch (mptm->tunnel) {
@@ -273,12 +321,12 @@ mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
             fprintf(stderr, "ERR: inner_d_mac value is incorrect\n");
             return NULL;
         }
-        geneve->dest_addr = parse_ipv4(mptm->dest_addr);
+        geneve->dest_addr = ipv4_to_int(mptm->dest_addr);
         if (geneve->dest_addr == -1) {
             fprintf(stderr, "ERR: dest_addr value is incorrect\n");
             return NULL;
         }
-        geneve->source_addr = parse_ipv4(mptm->source_addr);
+        geneve->source_addr = ipv4_to_int(mptm->source_addr);
         if (geneve->source_addr == -1) {
             fprintf(stderr, "ERR: source_addr value is incorrect\n");
             return NULL;
@@ -300,7 +348,6 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("Tunnel info element - {\n");
     printf("\tdebug = %u\n", tn->debug);
     printf("\tredirect = %u\n", tn->redirect);
-    printf("\tredirect_iface = %u\n", tn->redirect_if);
     printf("\tflags = %u\n", tn->flags);
     printf("\ttunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
     switch (tn->tunnel_type)
@@ -328,6 +375,27 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("}\n");
 }
 
+void do_get(mptm_args *mptm, int tunnel_info_map, int redirect_info_map) {
+
+    uint64_t key = get_key(mptm, false);
+    uint64_t inv_key = get_key(mptm, true);
+    fprintf(stdout, "key is %llx\n", key);
+    fprintf(stdout, "inv_key is %llx\n", inv_key);
+
+    mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
+    lookup_map(tunnel_map_fd, &key, ti, TUNNEL_INFO_MAP);
+    dump_tunnel_info(ti);
+
+    uint32_t ingress_redirect_if, egress_redirect_if;
+    lookup_map(redirect_info_map, &key, &ingress_redirect_if, REDIRECT_INFO_MAP);
+    lookup_map(redirect_info_map, &inv_key, &egress_redirect_if, REDIRECT_INFO_MAP);
+
+    fprintf(stdout, "Ingrese redirect if from %s to %s is %d\n", 
+            decode_ipv4(((uint32_t)key>>32)),
+            decode_ipv4(((uint32_t)key&&32)));
+
+}
+
 int main(int argc, char **argv) {
 
     mptm_args *mptm = (mptm_args *)malloc(sizeof(mptm_args));
@@ -339,15 +407,20 @@ int main(int argc, char **argv) {
     }
 
     /* Open the map for geneve config */
-    int tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_IFACE_MAP, NULL);
+    int tunnel_map_fd = open_bpf_map_file(PIN_BASE_DIR, TUNNEL_INFO_MAP, NULL);
     if (tunnel_map_fd < 0) {
           fprintf(stderr, "ERR: cannot open tunnel iface map\n");
         return EXIT_FAIL_BPF;
     }
 
-    fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, TUNNEL_IFACE_MAP);
+    fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, TUNNEL_INFO_MAP);
 
-    uint32_t key = parse_ipv4(mptm->key);
+    uint64_t key = get_key(mptm);
+    if (key == (uint64_t)-1) {
+        fprintf(stderr, "Key creation failed.");
+        return EXIT_FAIL;
+    }
+
     fprintf(stdout, "Key (source ip) is %d\n", key);
 
     int ret = EXIT_OK;
@@ -356,7 +429,7 @@ int main(int argc, char **argv) {
     {
     case MAP_GET: {
         mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
-        lookup_map(tunnel_map_fd, &key, ti, TUNNEL_IFACE_MAP);
+        lookup_map(tunnel_map_fd, &key, ti, TUNNEL_INFO_MAP);
         dump_tunnel_info(ti);
         break;
     }
@@ -369,15 +442,13 @@ int main(int argc, char **argv) {
             return EXIT_FAIL_OPTION;
         }
         fprintf(stdout, "created\n");
-        ret = update_map(tunnel_map_fd, MAP_ADD, &key, ti, 0, TUNNEL_IFACE_MAP);
+        ret = update_map(tunnel_map_fd, MAP_ADD, &key, ti, 0, TUNNEL_INFO_MAP);
         break;
     }
     case MAP_DELETE:
-        ret = update_map(tunnel_map_fd, MAP_DELETE, &key, NULL, 0, TUNNEL_IFACE_MAP);
+        ret = update_map(tunnel_map_fd, MAP_DELETE, &key, NULL, 0, TUNNEL_INFO_MAP);
         break;
     }
 
     return ret;
 }
-
-
