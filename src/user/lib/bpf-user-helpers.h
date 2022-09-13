@@ -121,6 +121,11 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
     return 0;
 }
 
+
+/*
+  TODO: Remove and replace with ipv4_aton
+ */
+
 /*
   Parse an ipv4 address and put the content in an integer with individual
   subnets bit shifted by 8.

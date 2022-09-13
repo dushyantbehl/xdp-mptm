@@ -24,8 +24,13 @@
 #define TUNNEL_INFO_MAP   "mptm_tunnel_info_map"
 #define REDIRECT_INFO_MAP   "mptm_redirect_info_map"
 
+#define TUNNEL_INFO_KEY(mptm)          __get_tunnel_info_map_key(mptm, true)
+#define TUNNEL_INFO_KEY_INV(mptm)      __get_tunnel_info_map_key(mptm, false)
+#define REDIRECT_INFO_KEY(mptm)        __get_redirect_map_key(mptm, true)
+#define REDIRECT_INFO_KEY_INV(mptm)    __get_redirect_map_key(mptm, false)
 
-typedef struct mptm_arguments {
+typedef struct {
+    /* Arguments for the tunnels */
     int action;
     u_int64_t vlid;
     u_int16_t flags;
@@ -41,8 +46,14 @@ typedef struct mptm_arguments {
     u_int8_t debug;
     u_int8_t tunnel;
     u_int8_t redirect;
-    char key[16];
-} mptm_args;
+
+    /* Map file descriptors and keys used for the maps */
+    int tunnel_map_fd;
+    int redirect_map_fd;
+    tunnel_map_key_t *tun_key;
+    redirect_map_key_t *redirect_key;
+    redirect_map_key_t *redirect_key_inv;
+} mptm_info;
 
 void  print_usage() {
   printf("\nPlease see usage:\n"
@@ -90,7 +101,7 @@ static const struct option long_options[] = {
 };
 
 // TODO: refactor?
-int verify_args(mptm_args *mptm) {
+int verify_args(mptm_info *mptm) {
     int action = mptm->action;
 
     // Key is always needed.
@@ -144,7 +155,7 @@ verified:
 }
 
 // Change name of verbose to logs (-l/--enable_logs)
-int parse_params(int argc, char *argv[], mptm_args *mptm) {
+int parse_params(int argc, char *argv[], mptm_info *mptm) {
     int opt = 0;
     int long_index = 0;
 
@@ -251,20 +262,18 @@ int parse_params(int argc, char *argv[], mptm_args *mptm) {
     return verify_args(mptm);
 }
 
-
-/* Returns key or uint64_t (-1) on error */
-static inline uint64_t get_key(mptm_args *mptm, bool inverted) {
-    uint64_t key = 0;
+static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
+    tunnel_map_key_t *key = (tunnel_map_key_t *)malloc(sizeof(tunnel_map_key_t));;
 
     struct in_addr saddr;
     struct in_addr daddr;
 
-    /* 
-     * We need to convert them individually to network byte order format
-     * and then combine to form the key because in the xdp program
-     * key is constructed by using the saddr and daddr directly from
-     * the packet and hence saves us two bswaps on each packet.
-     */
+    /*
+     We need to convert them individually to network byte order format
+     and then combine to form the key because in the xdp program
+     key is constructed by using the saddr and daddr directly from
+     the packet and hence saves us two bswaps on each packet.
+    */
     if (inet_aton(mptm->source_addr, &saddr) != 1) {
         fprintf(stderr, "ERR: failed to parse mptm source_addr");
         return -1;
@@ -279,15 +288,37 @@ static inline uint64_t get_key(mptm_args *mptm, bool inverted) {
     uint64_t d_addr = daddr.s_addr;
 
     if (inverted) {
-        key = d_addr<<32 + s_addr;
+        key->s_addr = d_addr;
+        key->d_addr = s_addr;
     } else {
-        key = s_addr<<32 + d_addr;
+        key->s_addr = s_addr;
+        key->d_addr = d_addr;
     }
 
     return key;
 }
 
-mptm_tunnel_info* create_tun_info(mptm_args *mptm) {
+static inline redirect_map_key_t *__get_redirect_map_key(mptm_info *mptm, bool inverted) {
+    redirect_map_key_t *key = (redirect_map_key_t *)malloc(sizeof(redirect_map_key_t));
+    struct in_addr daddr;
+
+    char *addr;
+    if (inverted) {
+        addr = mptm->source_addr;
+    } else {
+        addr = mptm->dest_addr;
+    }
+
+    if (inet_aton(addr, &daddr) != 1) {
+        fprintf(stderr, "ERR: failed to parse mptm dest_addr");
+        return -1;
+    }
+
+    *key = daddr.s_addr;
+    return key;
+}
+
+mptm_tunnel_info* create_tun_info(mptm_info *mptm) {
 
     mptm_tunnel_info *tn = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
 
@@ -372,30 +403,97 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("}\n");
 }
 
-void do_get(mptm_args *mptm, int tunnel_info_map, int redirect_info_map) {
-
-    uint64_t key = get_key(mptm, false);
-    uint64_t inv_key = get_key(mptm, true);
-    fprintf(stdout, "key is %llx\n", key);
-    fprintf(stdout, "inv_key is %llx\n", inv_key);
-
+int do_get(mptm_info *mptm) {
+    int ret;
+    uint32_t ingress_redirect_if, egress_redirect_if;
     mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
-    lookup_map(tunnel_map_fd, &key, ti, TUNNEL_INFO_MAP);
+
+    ret = lookup_map(mptm->tunnel_map_fd, mptm->tun_key, ti, TUNNEL_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup tunnel info");
+        return ret;
+    }
+
+    ret = lookup_map(mptm->redirect_info_map, mptm->redirect_key, &ingress_redirect_if, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup redirect ingress interface");
+        return ret;
+    }
+
+    ret = lookup_map(mptm->redirect_info_map, mptm->redirect_key_inv, &egress_redirect_if, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup redirect egress interface");
+        return ret;
+    }
+
     dump_tunnel_info(ti);
 
-    uint32_t ingress_redirect_if, egress_redirect_if;
-    lookup_map(redirect_info_map, &key, &ingress_redirect_if, REDIRECT_INFO_MAP);
-    lookup_map(redirect_info_map, &inv_key, &egress_redirect_if, REDIRECT_INFO_MAP);
+    fprintf(stdout, "Ingrese redirect if for %s to %s is %d\n", 
+            mptm->source_addr, mptm->dest_addr, ingress_redirect_if);
+    fprintf(stdout, "Egrese redirect if for %s to %s is %d\n", 
+            mptm->source_addr, mptm->dest_addr, egress_redirect_if);
 
-    fprintf(stdout, "Ingrese redirect if from %s to %s is %d\n", 
-            decode_ipv4(((uint32_t)key>>32)),
-            decode_ipv4(((uint32_t)key&&32)));
-
+    return EXIT_OK;
 }
+
+int do_delete(mptm_info *mptm) {
+    int ret;
+
+    ret = update_map(mptm->tunnel_info_map, MAP_DELETE, mptm->tun_key, NULL, 0, TUNNEL_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to delete tunnel info");
+        return ret;
+    }
+    ret = update_map(mptm->redirect_info_map, MAP_DELETE, mptm->redirect_key, NULL, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to delete redirect info");
+        return ret;
+    }
+    ret = update_map(mptm->redirect_info_map, MAP_DELETE, mptm->redirect_key_inv, NULL, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to delete redirect info inv");
+        return ret;
+    }
+    return EXIT_OK;
+}
+
+int do_add(mptm_info *mptm) {
+    int ret;
+
+    mptm_tunnel_info *ti = NULL;
+    fprintf(stdout, "Creating tunnel info object......");
+    ti = create_tun_info(mptm);
+    if(ti == NULL) {
+        fprintf(stderr, "ERR: failed creating struct\n");
+        return EXIT_FAIL_OPTION;
+    }
+    fprintf(stdout, "created\n");
+
+    ret = update_map(mptm->tunnel_map_fd, MAP_ADD, mptm->tun_key, ti, 0, TUNNEL_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add tunnel info");
+        return ret;
+    }
+
+    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, mptm->eth0_iface, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add redirect if");
+        return ret;
+    }
+
+    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key_inv, mptm->veth_iface, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add inverse redirect if");
+        return ret;
+    }
+
+    return EXIT_OK;
+}
+
 
 int main(int argc, char **argv) {
 
-    mptm_args *mptm = (mptm_args *)malloc(sizeof(mptm_args));
+    mptm_info *mptm = (mptm_info *)malloc(sizeof(mptm_info));
 
     if (parse_params(argc, argv, mptm) != 0) {
         fprintf(stderr, "ERR: parsing params failed\n");
@@ -409,41 +507,35 @@ int main(int argc, char **argv) {
           fprintf(stderr, "ERR: cannot open tunnel iface map\n");
         return EXIT_FAIL_BPF;
     }
-
     fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, TUNNEL_INFO_MAP);
 
-    uint64_t key = get_key(mptm);
-    if (key == (uint64_t)-1) {
-        fprintf(stderr, "Key creation failed.");
-        return EXIT_FAIL;
+    /* Open the map for geneve config */
+    int redirect_map_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_INFO_MAP);
+    if (redirect_map_fd < 0) {
+          fprintf(stderr, "ERR: cannot open redirect info map\n");
+        return EXIT_FAIL_BPF;
     }
+    fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, REDIRECT_INFO_MAP);
 
-    fprintf(stdout, "Key (source ip) is %d\n", key);
+    mptm->tunnel_map_fd = tunnel_map_fd;
+    mptm->redirect_map_fd = redirect_map_fd;
+
+    mptm->tun_key          = TUNNEL_INFO_KEY(mptm);
+    mptm->redirect_key     = REDIRECT_INFO_KEY(mptm);
+    mptm->redirect_key_inv = REDIRECT_INFO_KEY_INV(mptm);
 
     int ret = EXIT_OK;
 
     switch (mptm->action)
     {
-    case MAP_GET: {
-        mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
-        lookup_map(tunnel_map_fd, &key, ti, TUNNEL_INFO_MAP);
-        dump_tunnel_info(ti);
+    case MAP_GET:
+        ret = do_get(mptm);
         break;
-    }
-    case MAP_ADD: {
-        mptm_tunnel_info *ti = NULL;
-        fprintf(stdout, "Creating tunnel info object......");
-        ti = create_tun_info(mptm);
-        if(ti == NULL) {
-            fprintf(stderr, "ERR: failed creating struct\n");
-            return EXIT_FAIL_OPTION;
-        }
-        fprintf(stdout, "created\n");
-        ret = update_map(tunnel_map_fd, MAP_ADD, &key, ti, 0, TUNNEL_INFO_MAP);
+    case MAP_ADD:
+        ret = do_add(mptm);
         break;
-    }
     case MAP_DELETE:
-        ret = update_map(tunnel_map_fd, MAP_DELETE, &key, NULL, 0, TUNNEL_INFO_MAP);
+        ret = do_delete(mptm);
         break;
     }
 

@@ -28,20 +28,25 @@
 
 struct bpf_map_def SEC("maps") mptm_tunnel_info_map = {
     .type        = BPF_MAP_TYPE_HASH,
-    .key_size    = sizeof(__u64),
+    .key_size    = sizeof(tunnel_map_key_t),
     .value_size  = sizeof(mptm_tunnel_info),
     .max_entries = MAX_ENTRIES,
 };
 
 /*
+    Here is how MPTM maps work.
+    mptm_tunnel_info_map is where rules are
+
+    mptm_tunnel_redirect_map is where have a redirection map
+    based on destination ip.
     This map contains twice the entry because for egress from container
-    the entry src:node1->dst:node2 is set to eth0 but on ingress the
+    the entry src:node1->dst:node2 is set to dst:node2->eth0 but on ingress the
     program xdp_pop looks at a pakcet src:node2->dst:node1 which has value
-    set to id of the veth device to redirect to the container.
+    set to id of the dst:node1->veth device to redirect to the container.
 */
 struct bpf_map_def SEC("maps") mptm_tunnel_redirect_map = {
     .type        = BPF_MAP_TYPE_DEVMAP_HASH,
-    .key_size    = sizeof(__u64),
+    .key_size    = sizeof(redirect_map_key_t),
     .value_size  = sizeof(__u32),
     .max_entries = MAX_ENTRIES*2,
 };
@@ -52,7 +57,7 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     struct ethhdr *eth;
     struct iphdr *ip;
     struct tunnel_info* tn;
-    mptm_key_t key;
+    tunnel_map_key_t key;
     __u8 tun_type;
 
     /* Parse the ethhdr and iphdr from ctx */
@@ -60,7 +65,6 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
         goto out;
     }
 
-    /* Get the tunnel struct based on packet src and dest */
     key.s_addr = ip->saddr;
     key.d_addr = ip->daddr;
 
@@ -83,7 +87,7 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
 
     if (tn->redirect) {
         __u64 flags = 0; // keep redirect flags zero for now
-        action = bpf_redirect_map(&mptm_tunnel_redirect_map, &key, flags);
+        action = bpf_redirect_map(&mptm_tunnel_redirect_map, ip->daddr, flags);
     }
 
   out:
@@ -100,6 +104,9 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     // use inner destination ip as the key in the tunnel iface map
     // if present then do decap and send to the ingress interface present
     // in the tunnel map
+
+    /* get key as follows */
+    // redirect_map_key_t key = ip->daddr;
 
   out:
     return xdp_stats_record_action(ctx, action);

@@ -50,4 +50,6 @@ typedef struct tunnel_info {
 typedef struct mptm_map_key {
     __be32 s_addr;
     __be32 d_addr;
-} __attribute__((packed)) mptm_key_t;
+} __attribute__((packed)) tunnel_map_key_t;
+
+typedef __be32 redirect_map_key_t;
