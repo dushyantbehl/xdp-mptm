@@ -185,8 +185,10 @@ char *get_tunnel_name(uint8_t tunnel) {
     inet_ntoa(ip_addr);              \
 })
 
-#define decode_mac(mac) ({ \
-    char eth[18];               \
-    sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
-    eth;\
+#define decode_mac(mac) ({             \
+    char eth[18];                      \
+    sprintf(eth, "%x:%x:%x:%x:%x:%x",  \
+            mac[0], mac[1], mac[2],    \
+            mac[3], mac[4], mac[5]);   \
+    eth;                               \
 })
