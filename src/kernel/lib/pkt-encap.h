@@ -156,8 +156,8 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     ip->tos = 0;
     ip->tot_len = bpf_htons(outer_ip_payload);
  
-    ip->daddr = bpf_htonl(tn->dest_addr);
-    ip->saddr = bpf_htonl(tn->source_addr);
+    ip->daddr = tn->dest_addr;
+    ip->saddr = tn->source_addr;
     ip->ttl = DEFAULT_TTL;
         
     __u64 c_sum = 0;
@@ -167,7 +167,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //TODO: Put right checksum.
     //For now make check 0
     udp->check = 0;
-    udp->source = bpf_htons(tn->source_port); // TODO: a hash value based on inner IP packet
+    udp->source = tn->source_port; // TODO: a hash value based on inner IP packet
     udp->dest = GEN_DSTPORT;
     udp->len = bpf_htons(outer_udp_payload);
 
