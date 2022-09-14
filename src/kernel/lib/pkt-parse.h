@@ -34,21 +34,24 @@
 
 extern struct bpf_map_def mptm_tunnel_iface_map;
 
-static __always_inline int parse_pkt_headers(struct xdp_md *ctx,
-                        struct ethhdr **ethhdr,
-                        struct iphdr **iphdr)
+/* Parse eth, ip and udp headers of a packet.
+ * If any header is passed as NULL then stop processing and return.
+ */
+static __always_inline int parse_pkt_headers(void *data, void *data_end,
+                                             struct ethhdr **ethhdr,
+                                             struct iphdr **iphdr,
+                                             struct udphdr **udphdr)
 {
     struct hdr_cursor nh;
-
-    /* These keep track of the next header type and iterator pointer */
-    struct ethhdr *eth;
     int nh_type;
-    struct iphdr *ip;
-
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
-
     nh.pos = data;
+
+    if (ethhdr == NULL)
+        return 0;
+
+    struct ethhdr *eth;
     nh_type = parse_ethhdr(&nh, data_end, &eth);
     if (nh_type == -1)
       goto out_fail;
@@ -58,13 +61,35 @@ static __always_inline int parse_pkt_headers(struct xdp_md *ctx,
         // We don't support ipv6 for now.
         goto out_fail;
 
+    /* set the header */
+    *ethhdr = eth;
+
+    if (iphdr == NULL)
+        return 0;
+
+    struct iphdr *ip;
     nh_type = parse_iphdr(&nh, data_end, &ip);
     if (nh_type == -1)
       goto out_fail;
 
-    /* set return values */
-    *ethhdr = eth;
+    /* set the header */
     *iphdr = ip;
+
+    if (udphdr == NULL)
+        return 0;
+
+    struct udphdr *udp;
+    /* Check the protocol. If TCP we return else for udp we process further */
+    if (nh_type == IPPROTO_TCP)
+        goto out_fail;
+
+    /* Parse udp header */
+    nh_type = parse_udphdr(&nh, data_end, &udp);
+    if (nh_type == -1)
+        goto out_fail;
+
+    /* set the header */
+    *udphdr = udp;
 
     return 0;
 
