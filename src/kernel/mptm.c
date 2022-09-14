@@ -83,7 +83,7 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
 
     if (tn->redirect) {
         __u64 flags = 0; // keep redirect flags zero for now
-        u32 *counter;
+        __u32 *counter;
 
         redirect_map_key_t redirect_key = ip->daddr;
         counter = bpf_map_lookup_elem(&mptm_tunnel_redirect_map, &redirect_key);
@@ -112,6 +112,8 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
 
     /* get key as follows */
     // redirect_map_key_t key = ip->daddr;
+
+    goto out;
 
   out:
     return xdp_stats_record_action(ctx, action);
