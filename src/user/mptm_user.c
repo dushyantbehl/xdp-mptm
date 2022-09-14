@@ -293,27 +293,14 @@ static inline uint32_t get_if_devmap_map_key(mptm_info *mptm) {
 static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
     tunnel_map_key_t *key = (tunnel_map_key_t *)malloc(sizeof(tunnel_map_key_t));;
 
-    struct in_addr saddr;
-    struct in_addr daddr;
-
     /*
      We need to convert them individually to network byte order format
      and then combine to form the key because in the xdp program
      key is constructed by using the saddr and daddr directly from
      the packet and hence saves us two bswaps on each packet.
     */
-    if (inet_aton(mptm->source_addr, &saddr) != 1) {
-        fprintf(stderr, "ERR: failed to parse mptm source_addr");
-        return NULL;
-    }
-
-    if (inet_aton(mptm->dest_addr, &daddr) != 1) {
-        fprintf(stderr, "ERR: failed to parse mptm dest_addr");
-        return NULL;
-    }
-
-    uint64_t s_addr = saddr.s_addr;
-    uint64_t d_addr = daddr.s_addr;
+    uint32_t s_addr = ipv4_to_ineta(mptm->source_addr);
+    uint32_t d_addr = ipv4_to_ineta(mptm->dest_addr);
 
     if (inverted) {
         key->s_addr = d_addr;
@@ -328,21 +315,11 @@ static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool 
 
 static inline redirect_map_key_t *__get_redirect_map_key(mptm_info *mptm, bool inverted) {
     redirect_map_key_t *key = (redirect_map_key_t *)malloc(sizeof(redirect_map_key_t));
-    struct in_addr daddr;
-
-    char *addr;
     if (inverted) {
-        addr = mptm->source_addr;
+        *key = ipv4_to_ineta(mptm->source_addr);
     } else {
-        addr = mptm->dest_addr;
+        *key = ipv4_to_ineta(mptm->dest_addr);
     }
-
-    if (inet_aton(addr, &daddr) != 1) {
-        fprintf(stderr, "ERR: failed to parse mptm dest_addr");
-        return NULL;
-    }
-
-    *key = daddr.s_addr;
     return key;
 }
 
@@ -364,7 +341,7 @@ mptm_tunnel_info* create_tun_info(mptm_info *mptm) {
     case GENEVE: {
         struct geneve_info *geneve = (struct geneve_info *)(&tn->tnl_info.geneve);
         geneve->vlan_id = mptm->vlid;
-        geneve->source_port = mptm->source_port;
+        geneve->source_port = __bswap_16(mptm->source_port);
         if (parse_mac(mptm->source_mac, geneve->source_mac) < 0) {
             fprintf(stderr, "ERR: source_mac value is incorrect\n");
             return NULL;
@@ -377,13 +354,13 @@ mptm_tunnel_info* create_tun_info(mptm_info *mptm) {
             fprintf(stderr, "ERR: inner_d_mac value is incorrect\n");
             return NULL;
         }
-        geneve->dest_addr = ipv4_to_int(mptm->dest_addr);
-        if (geneve->dest_addr == -1) {
+        geneve->dest_addr = ipv4_to_ineta(mptm->dest_addr);
+        if (geneve->dest_addr == 0) {
             fprintf(stderr, "ERR: dest_addr value is incorrect\n");
             return NULL;
         }
-        geneve->source_addr = ipv4_to_int(mptm->source_addr);
-        if (geneve->source_addr == -1) {
+        geneve->source_addr = ipv4_to_ineta(mptm->source_addr);
+        if (geneve->source_addr == 0) {
             fprintf(stderr, "ERR: source_addr value is incorrect\n");
             return NULL;
         }

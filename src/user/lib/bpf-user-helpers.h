@@ -121,38 +121,14 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
     return 0;
 }
 
+uint32_t ipv4_to_ineta(char* ip) {
+    struct in_addr addr;
 
-/*
-  TODO: Remove and replace with ipv4_aton
- */
-
-/*
-  Parse an ipv4 address and put the content in an integer with individual
-  subnets bit shifted by 8.
-  [10, 10, 1, 2] becomes 10100102
-*/
-uint32_t ipv4_to_int(char _ipadr[]) {
-
-    char ipadr[16];
-    uint32_t addr = 0, val;
-
-    // Make a copy of the string before breaking it down
-    strncpy(ipadr, _ipadr, 16);
-
-    char *tok = strtok(ipadr,".");
-    for (int i=0; i<4; i++) {
-        val = strtol(tok, NULL, 10);
-        if (tok == NULL || val > 255) {
-            fprintf(stderr, "Passed ipaddr %s is invalid.\n", ipadr);
-            return -1;
-        }
-        addr = ((addr<<8) + val);
-        tok = strtok(NULL,".");
+    if (inet_aton(ip, &addr) != 1) {
+        fprintf(stderr, "ERR: failed to parse ip addr %s\n", ip);
+        return 0;
     }
-    if (addr == 0) {
-        fprintf(stderr, "Passed ipaddr is 0.0.0.0, might not be valid\n");
-    }
-    return(addr);
+    return addr.s_addr;;
 }
 
 char *get_tunnel_name(uint8_t tunnel) {
