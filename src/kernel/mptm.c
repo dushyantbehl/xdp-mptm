@@ -33,20 +33,16 @@ struct bpf_map_def SEC("maps") mptm_tunnel_info_map = {
     .max_entries = MAX_ENTRIES,
 };
 
-/*
-    Here is how MPTM maps work.
-    mptm_tunnel_info_map is where rules are
-
-    mptm_tunnel_redirect_map is where have a redirection map
-    based on destination ip.
-    This map contains twice the entry because for egress from container
-    the entry src:node1->dst:node2 is set to dst:node2->eth0 but on ingress the
-    program xdp_pop looks at a pakcet src:node2->dst:node1 which has value
-    set to id of the dst:node1->veth device to redirect to the container.
-*/
 struct bpf_map_def SEC("maps") mptm_tunnel_redirect_map = {
-    .type        = BPF_MAP_TYPE_DEVMAP_HASH,
+    .type        = BPF_MAP_TYPE_HASH,
     .key_size    = sizeof(redirect_map_key_t),
+    .value_size  = sizeof(__u32),
+    .max_entries = MAX_ENTRIES*2,
+};
+
+struct bpf_map_def SEC("maps") mptm_tunnel_redirect_if_devmap = {
+    .type        = BPF_MAP_TYPE_DEVMAP,
+    .key_size    = sizeof(__u32),
     .value_size  = sizeof(__u32),
     .max_entries = MAX_ENTRIES*2,
 };
@@ -68,7 +64,7 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
     key.s_addr = ip->saddr;
     key.d_addr = ip->daddr;
 
-    tn = = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
+    tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
     if(tn == NULL) {
       mptm_print("[ERR] map entry missing for key %d\n", key);
       goto out;
@@ -87,7 +83,16 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
 
     if (tn->redirect) {
         __u64 flags = 0; // keep redirect flags zero for now
-        action = bpf_redirect_map(&mptm_tunnel_redirect_map, ip->daddr, flags);
+        u32 *counter;
+
+        redirect_map_key_t redirect_key = ip->daddr;
+        counter = bpf_map_lookup_elem(&mptm_tunnel_redirect_map, &redirect_key);
+        if(counter == NULL) {
+            bpf_debug("[ERR] map entry missing for redirect key %d\n", redirect_key);
+            goto out;
+        }
+
+        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, *counter, flags);
     }
 
   out:

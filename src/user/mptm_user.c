@@ -21,8 +21,9 @@
 #include <user/lib/bpf-user-helpers.h>
 
 // TODO: make sure this can be overridden using env or argument
-#define TUNNEL_INFO_MAP   "mptm_tunnel_info_map"
+#define TUNNEL_INFO_MAP     "mptm_tunnel_info_map"
 #define REDIRECT_INFO_MAP   "mptm_redirect_info_map"
+#define REDIRECT_IF_DEVMAP  "mptm_redirect_if_devmap"
 
 #define TUNNEL_INFO_KEY(mptm)          __get_tunnel_info_map_key(mptm, true)
 #define TUNNEL_INFO_KEY_INV(mptm)      __get_tunnel_info_map_key(mptm, false)
@@ -50,6 +51,7 @@ typedef struct {
     /* Map file descriptors and keys used for the maps */
     int tunnel_map_fd;
     int redirect_map_fd;
+    int redirect_if_devmap_fd;
     tunnel_map_key_t *tun_key;
     redirect_map_key_t *redirect_key;
     redirect_map_key_t *redirect_key_inv;
@@ -260,6 +262,34 @@ int parse_params(int argc, char *argv[], mptm_info *mptm) {
     return verify_args(mptm);
 }
 
+static inline uint32_t get_if_devmap_map_key(mptm_info *mptm) {
+    // Look into the redirect_map, id zero should contain the counter
+    // Increament the counter and that forms the new key for redirect_if_devmap
+    int ret;
+
+    redirect_map_key_t primary_key = 0;
+    uint32_t counter;
+
+    ret = lookup_map(mptm->redirect_map_fd, &primary_key, &counter, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup counter, initializing value to 1\n");
+        // Initialize counter as 1 and set for the key.
+        counter = 1;
+    } else {
+        fprintf(stderr, "found counter %d",counter);
+        counter += 1;
+        fprintf(stderr, "now set to %d\n",counter);
+    }
+
+    ret = update_map(mptm->redirect_map_fd, MAP_ADD, &primary_key, &counter, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add redirect if");
+        return ret;
+    }
+
+    return counter;
+}
+
 static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
     tunnel_map_key_t *key = (tunnel_map_key_t *)malloc(sizeof(tunnel_map_key_t));;
 
@@ -403,6 +433,7 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
 
 int do_get(mptm_info *mptm) {
     int ret;
+    uint32_t ingress_counter, egress_counter;
     uint32_t ingress_redirect_if, egress_redirect_if;
     mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
 
@@ -412,13 +443,25 @@ int do_get(mptm_info *mptm) {
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key, &ingress_redirect_if, REDIRECT_INFO_MAP);
+    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key, &ingress_counter, REDIRECT_INFO_MAP);
     if (ret != EXIT_OK) {
         fprintf(stderr, "failed to lookup redirect ingress interface");
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key_inv, &egress_redirect_if, REDIRECT_INFO_MAP);
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &ingress_counter, &ingress_redirect_if, REDIRECT_IF_DEVMAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup redirect ingress counter");
+        return ret;
+    }
+
+    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key_inv, &egress_counter, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to lookup redirect egress counter");
+        return ret;
+    }
+
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &egress_counter, &egress_redirect_if, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         fprintf(stderr, "failed to lookup redirect egress interface");
         return ret;
@@ -473,13 +516,29 @@ int do_add(mptm_info *mptm) {
         return ret;
     }
 
-    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, &mptm->eth0_iface, 0, REDIRECT_INFO_MAP);
+    uint32_t ingress_counter = get_if_devmap_map_key(mptm);
+
+    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, &ingress_counter, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add redirect ingress counter");
+        return ret;
+    }
+
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, mptm->redirect_key, &mptm->eth0_iface, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         fprintf(stderr, "failed to add redirect if");
         return ret;
     }
 
-    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key_inv, &mptm->veth_iface, 0, REDIRECT_INFO_MAP);
+    uint32_t egress_counter = get_if_devmap_map_key(mptm);
+
+    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, &egress_counter, 0, REDIRECT_INFO_MAP);
+    if (ret != EXIT_OK) {
+        fprintf(stderr, "failed to add redirect egress counter");
+        return ret;
+    }
+
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &egress_counter, &mptm->veth_iface, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         fprintf(stderr, "failed to add inverse redirect if");
         return ret;
@@ -487,7 +546,6 @@ int do_add(mptm_info *mptm) {
 
     return EXIT_OK;
 }
-
 
 int main(int argc, char **argv) {
 
@@ -515,8 +573,17 @@ int main(int argc, char **argv) {
     }
     fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, REDIRECT_INFO_MAP);
 
+    /* Open the map for geneve config */
+    int redirect_if_devmap_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_IF_DEVMAP);
+    if (redirect_map_fd < 0) {
+          fprintf(stderr, "ERR: cannot open redirect if devmap\n");
+        return EXIT_FAIL_BPF;
+    }
+    fprintf(stdout, "Opened bpf map file %s/%s\n", PIN_BASE_DIR, REDIRECT_IF_DEVMAP);
+
     mptm->tunnel_map_fd = tunnel_map_fd;
     mptm->redirect_map_fd = redirect_map_fd;
+    mptm->redirect_if_devmap_fd = redirect_if_devmap_fd;
 
     mptm->tun_key = TUNNEL_INFO_KEY(mptm);
     if (mptm->tun_key == NULL) {
