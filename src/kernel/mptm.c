@@ -132,18 +132,13 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
     struct iphdr *ip;
     struct udphdr *udp;
 
-    /* map values and tunnel informations */
-    struct tunnel_info* tn;
-    tunnel_map_key_t key;
-    __u8 tun_type;
-
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
 
     if (parse_pkt_headers(data, data_end, &eth, &ip, &udp) != 0)
         goto out;
 
-    if (udphdr->dest == BE_GEN_DSTPORT) {
+    if (udp->dest == BE_GEN_DSTPORT) {
         // GENEVE packet
         // Check inner packet if there is a rule corresponding to
         // inner source which will be source for us as we received the packet
@@ -179,7 +174,7 @@ int mptm_xdp_tunnel_pop(struct xdp_md *ctx) {
 
         tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
         if(tn == NULL) {
-            mptm_print("[ERR] map entry missing for key %d\n", key);
+            mptm_print("[ERR] map entry missing for key {saddr:%x,daddr:%x}\n", key.s_addr, key.d_addr);
             goto out;
         }
 

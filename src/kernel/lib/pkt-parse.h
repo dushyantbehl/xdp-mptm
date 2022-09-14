@@ -44,8 +44,6 @@ static __always_inline int parse_pkt_headers(void *data, void *data_end,
 {
     struct hdr_cursor nh;
     int nh_type;
-    void *data = (void *)((long)ctx->data);
-    void *data_end = (void *)((long)ctx->data_end);
     nh.pos = data;
 
     if (ethhdr == NULL)
