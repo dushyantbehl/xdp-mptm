@@ -39,7 +39,6 @@ static __always_inline int parse_pkt_headers(struct xdp_md *ctx,
                         struct iphdr **iphdr)
 {
     struct hdr_cursor nh;
-    mptm_tunnel_info *tn;
 
     /* These keep track of the next header type and iterator pointer */
     struct ethhdr *eth;
