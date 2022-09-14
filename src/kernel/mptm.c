@@ -66,7 +66,8 @@ int mptm_xdp_tunnel_push(struct xdp_md *ctx) {
 
     tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
     if(tn == NULL) {
-      mptm_print("[ERR] map entry missing for key %d\n", key);
+      mptm_print("[ERR] map entry missing for key-{saddr:%x,daddr:%x}\n",
+                 key.s_addr, key.d_addr);
       goto out;
     }
 
