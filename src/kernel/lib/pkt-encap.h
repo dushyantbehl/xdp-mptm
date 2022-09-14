@@ -30,8 +30,8 @@
 #include <kernel/lib/geneve.h>
 #include <kernel/lib/mptm-debug.h>
 
-#define DEFAULT_TTL 64
-#define GEN_DSTPORT 0xc117
+#define DEFAULT_TTL     64
+#define BE_GEN_DSTPORT  0xc117
 
 __ALWAYS_INLINE__
 static inline void set_dst_mac(void *data, unsigned char *dst_mac)
@@ -168,7 +168,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //For now make check 0
     udp->check = 0;
     udp->source = tn->source_port; // TODO: a hash value based on inner IP packet
-    udp->dest = GEN_DSTPORT;
+    udp->dest = BE_GEN_DSTPORT;
     udp->len = bpf_htons(outer_udp_payload);
 
     __builtin_memset(geneve, 0, gnv_hdr_size);
