@@ -24,52 +24,77 @@
 #include <kernel/lib/map-defs.h>
 #include <kernel/lib/mptm-debug.h>
 
+/* Inspired from Katran.
+ * ETH_P_IP and ETH_P_IPV6 in Big Endian format.
+ * So we don't have to do htons on each packet
+ */
+#define BE_ETH_P_IP   0x0008
+#define BE_ETH_P_IPV6 0xDD88
+#define BE_ETH_P_ARP  0x0608
+
 extern struct bpf_map_def mptm_tunnel_iface_map;
 
-static __always_inline int parse_tunnel_info(struct xdp_md *ctx,
-                        struct ethhdr **ethhdr,
-                        mptm_tunnel_info **mptm_tn)
+/* Parse eth, ip and udp headers of a packet.
+ * If any header is passed as NULL then stop processing and return.
+ */
+static __always_inline int parse_pkt_headers(void *data, void *data_end,
+                                             struct ethhdr **ethhdr,
+                                             struct iphdr **iphdr,
+                                             struct udphdr **udphdr)
 {
-    int ret = 1;
     struct hdr_cursor nh;
-    mptm_tunnel_info *tn;
-
-    /* These keep track of the next header type and iterator pointer */
-    struct ethhdr *eth;
     int nh_type;
-    struct iphdr *iphdr;
-
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
-
     nh.pos = data;
+
+    if (ethhdr == NULL)
+        return 0;
+
+    struct ethhdr *eth;
     nh_type = parse_ethhdr(&nh, data_end, &eth);
     if (nh_type == -1)
-      goto out;
-    if (eth->h_proto == bpf_htons(ETH_P_ARP))
-      goto out;
-    if (eth->h_proto != __constant_htons(ETH_P_IP))
+      goto out_fail;
+    if (eth->h_proto == BE_ETH_P_ARP)
+      goto out_fail;
+    if (eth->h_proto != BE_ETH_P_IP)
         // We don't support ipv6 for now.
-        goto out;
+        goto out_fail;
 
-    nh_type = parse_iphdr(&nh, data_end, &iphdr);
-    if (nh_type == -1)
-      goto out;
-
-    __u32 key = bpf_ntohl(iphdr->saddr);
-    tn = bpf_map_lookup_elem(&mptm_tunnel_iface_map, &key);
-    if(tn == NULL) {
-      mptm_print("[ERR] map entry missing for key %d\n", key);
-      goto out;
-    }
-
-    /* set return values */
+    /* set the header */
     *ethhdr = eth;
-    *mptm_tn = tn;
-    ret = 0;
 
-    out:
-        return ret;
+    if (iphdr == NULL)
+        return 0;
+
+    struct iphdr *ip;
+    nh_type = parse_iphdr(&nh, data_end, &ip);
+    if (nh_type == -1)
+      goto out_fail;
+
+    /* set the header */
+    *iphdr = ip;
+
+    if (udphdr == NULL)
+        return 0;
+
+    struct udphdr *udp;
+    /* Check the protocol. If TCP we return else for udp we process further */
+    if (nh_type == IPPROTO_TCP)
+        goto out_fail;
+
+    /* Parse udp header */
+    nh_type = parse_udphdr(&nh, data_end, &udp);
+    if (nh_type == -1)
+        goto out_fail;
+
+    /* set the header */
+    *udphdr = udp;
+
+    return 0;
+
+    out_fail:
+        return 1;
 }
 
 #endif /*  __PKT_PARSE__ */

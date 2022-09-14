@@ -11,10 +11,10 @@
 
 #include <kernel/lib/mptm-debug.h>
 
-#define MAX_ENTRIES 30
+#define MAX_ENTRIES 1024
 
 struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
-    .type        = BPF_MAP_TYPE_DEVMAP_HASH,
+    .type        = BPF_MAP_TYPE_DEVMAP,
     .key_size    = sizeof(__u32),
     .value_size  = sizeof(__u32),
     .max_entries = MAX_ENTRIES,

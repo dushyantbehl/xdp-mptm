@@ -12,8 +12,8 @@
  * Palanivel Kodeswaran <palani.kodeswaran@in.ibm.com>
  */
 
-#ifndef __KERNEL_LIB_GENEVE_HEADERS_H__
-#define __KERNEL_LIB_GENEVE_HEADERS_H__
+#ifndef __KERNEL_LIB_GENEVE_H__
+#define __KERNEL_LIB_GENEVE_H__
 
 #pragma once
 
@@ -61,4 +61,4 @@ struct ipv4_tuple_t {
     /*TODO: include TCP flags, no use case for the moment! */
 } __attribute__((packed));
 
-#endif /* __KERNEL_LIB_GENEVE_HEADERS_H__ */
+#endif /* __KERNEL_LIB_GENEVE_H__ */

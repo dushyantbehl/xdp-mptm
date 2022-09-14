@@ -24,14 +24,16 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
+
 #include <common/rewrite_helpers.h>
 
+#include <kernel/lib/inline.h>
 #include <kernel/lib/map-defs.h>
 #include <kernel/lib/geneve.h>
 #include <kernel/lib/mptm-debug.h>
 
-#define DEFAULT_TTL 64
-#define GEN_DSTPORT 0xc117
+#define DEFAULT_TTL     64
+#define BE_GEN_DSTPORT  0xc117
 
 __ALWAYS_INLINE__
 static inline void set_dst_mac(void *data, unsigned char *dst_mac)
@@ -141,7 +143,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //pkt->rts_opt = (void *)&pkt->geneve->options[0];
 
     // Populate the outer header fields 
-    ethcpy->h_proto = bpf_htons(ETH_P_IP);
+    ethcpy->h_proto = BE_ETH_P_IP;
     set_dst_mac(data, tn->dest_mac);
     set_src_mac(data, tn->source_mac);
     
@@ -156,8 +158,8 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     ip->tos = 0;
     ip->tot_len = bpf_htons(outer_ip_payload);
  
-    ip->daddr = bpf_htonl(tn->dest_addr);
-    ip->saddr = bpf_htonl(tn->source_addr);
+    ip->daddr = tn->dest_addr;
+    ip->saddr = tn->source_addr;
     ip->ttl = DEFAULT_TTL;
         
     __u64 c_sum = 0;
@@ -167,8 +169,8 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //TODO: Put right checksum.
     //For now make check 0
     udp->check = 0;
-    udp->source = bpf_htons(tn->source_port); // TODO: a hash value based on inner IP packet
-    udp->dest = GEN_DSTPORT;
+    udp->source = tn->source_port; // TODO: a hash value based on inner IP packet
+    udp->dest = BE_GEN_DSTPORT;
     udp->len = bpf_htons(outer_udp_payload);
 
     __builtin_memset(geneve, 0, gnv_hdr_size);

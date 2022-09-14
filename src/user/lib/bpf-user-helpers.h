@@ -22,16 +22,16 @@
 #include <kernel/lib/map-defs.h> 
                      
 /* Exit return codes */
-#define EXIT_OK 		 0 /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
-#define EXIT_FAIL		 1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
-#define EXIT_FAIL_OPTION	 2
-#define EXIT_FAIL_XDP		30
-#define EXIT_FAIL_BPF		40 
+#define EXIT_OK             0 /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
+#define EXIT_FAIL           1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
+#define EXIT_FAIL_OPTION    2
+#define EXIT_FAIL_XDP       30
+#define EXIT_FAIL_BPF       40 
 
 /* map action codes */
 #define MAP_ADD 0
 #define MAP_DELETE 1
-#define MAP_GET 3     
+#define MAP_GET 3
 
 #define str(x)  #x
 #define xstr(x) str(x)
@@ -39,28 +39,28 @@
 #define PIN_BASE_DIR "/sys/fs/bpf"
 
 #ifndef PATH_MAX
-#define PATH_MAX	4096
+#define PATH_MAX    4096
 #endif
 
 int load_bpf_mapfile(const char *dir, const char *mapname) {
-	char filename[PATH_MAX];
-	int len, fd;
+    char filename[PATH_MAX];
+    int len, fd;
 
-	len = snprintf(filename, PATH_MAX, "%s/%s", dir, mapname);
-	if (len < 0) {
-		fprintf(stderr, "ERR: constructing full mapname path\n");
-		return -1;
-	}
+    len = snprintf(filename, PATH_MAX, "%s/%s", dir, mapname);
+    if (len < 0) {
+        fprintf(stderr, "ERR: constructing full mapname path\n");
+        return -1;
+    }
 
-	fd = bpf_obj_get(filename);
-	if (fd < 0) {
-		fprintf(stderr,
-			"WARN: Failed to open bpf map file:%s err(%d):%s\n",
-			filename, errno, strerror(errno));
-		return fd;
-	}
+    fd = bpf_obj_get(filename);
+    if (fd < 0) {
+        fprintf(stderr,
+            "WARN: Failed to open bpf map file:%s err(%d):%s\n",
+            filename, errno, strerror(errno));
+        return fd;
+    }
 
-	return fd;
+    return fd;
 }
 
 /* Calls bpf update/delete elem based on the action. */
@@ -121,33 +121,14 @@ int parse_mac(char *str, unsigned char mac[ETH_ALEN]) {
     return 0;
 }
 
-/*
-  Parse an ipv4 address and put the content in an integer with individual
-  subnets bit shifted by 8.
-  [10, 10, 1, 2] becomes 10100102
-*/
-uint32_t parse_ipv4(char _ipadr[]) {
+uint32_t ipv4_to_ineta(char* ip) {
+    struct in_addr addr;
 
-    char ipadr[16];
-    uint32_t addr = 0, val;
-
-    // Make a copy of the string before breaking it down
-    strncpy(ipadr, _ipadr, 16);
-
-    char *tok = strtok(ipadr,".");
-    for (int i=0; i<4; i++) {
-        val = strtol(tok, NULL, 10);
-        if (tok == NULL || val > 255) {
-            fprintf(stderr, "Passed ipaddr %s is invalid.\n", ipadr);
-            return -1;
-        }
-        addr = ((addr<<8) + val);
-        tok = strtok(NULL,".");
+    if (inet_aton(ip, &addr) != 1) {
+        fprintf(stderr, "ERR: failed to parse ip addr %s\n", ip);
+        return 0;
     }
-    if (addr == 0) {
-        fprintf(stderr, "Passed ipaddr is 0.0.0.0, might not be valid\n");
-    }
-    return(addr);
+    return addr.s_addr;;
 }
 
 char *get_tunnel_name(uint8_t tunnel) {
@@ -170,15 +151,20 @@ char *get_tunnel_name(uint8_t tunnel) {
     return tunnel_name;
 }
 
+/*
+ * First convert to network byte order
+ * using __bswap_32 which inet_ntoa expects.
+ */
 #define decode_ipv4(ip) ({           \
     struct in_addr ip_addr;          \
     ip_addr.s_addr = __bswap_32(ip); \
     inet_ntoa(ip_addr);              \
 })
 
-#define decode_mac(mac) ({ \
-    char eth[18];               \
-    sprintf(eth, "%x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);\
-    eth;\
+#define decode_mac(mac) ({             \
+    char eth[18];                      \
+    sprintf(eth, "%x:%x:%x:%x:%x:%x",  \
+            mac[0], mac[1], mac[2],    \
+            mac[3], mac[4], mac[5]);   \
+    eth;                               \
 })
-
