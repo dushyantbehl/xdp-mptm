@@ -24,8 +24,10 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
+
 #include <common/rewrite_helpers.h>
 
+#include <kernel/lib/inline.h>
 #include <kernel/lib/map-defs.h>
 #include <kernel/lib/geneve.h>
 #include <kernel/lib/mptm-debug.h>
