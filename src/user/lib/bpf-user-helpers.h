@@ -20,7 +20,15 @@
 #include <byteswap.h>
 
 #include <kernel/lib/map-defs.h> 
-                     
+
+#ifdef eprintf
+#undef eprintf
+#endif
+
+#define eprintf(...)                                        \
+        fprintf(stderr, "ERROR %s:%d: ", __FUNCTION__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__)
+
 /* Exit return codes */
 #define EXIT_OK             0 /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
 #define EXIT_FAIL           1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
@@ -48,7 +56,7 @@ int load_bpf_mapfile(const char *dir, const char *mapname) {
 
     len = snprintf(filename, PATH_MAX, "%s/%s", dir, mapname);
     if (len < 0) {
-        fprintf(stderr, "ERR: constructing full mapname path\n");
+        eprintf("constructing full mapname path\n");
         return -1;
     }
 
@@ -78,7 +86,7 @@ int update_map(int mapfd, int action, void *key, void *value,
         break;
     }
     if (ret != 0){
-        fprintf(stderr, "ERR: updating map %s, errno %d\n", map_name, errno);
+        eprintf("updating map %s, errno %d\n", map_name, errno);
         return EXIT_FAIL_BPF;
     }
     return EXIT_OK;
@@ -87,7 +95,7 @@ int update_map(int mapfd, int action, void *key, void *value,
 int lookup_map(int mapfd, void *key, void *value, char *map_name) {
     int ret = bpf_map_lookup_elem(mapfd, key, value);
     if (ret != 0){
-        fprintf(stderr, "ERR: lookup map %s, errno %d\n", map_name, errno);
+        eprintf("lookup map %s, errno %d\n", map_name, errno);
         return EXIT_FAIL_BPF;
     }
     return EXIT_OK;
@@ -125,7 +133,7 @@ uint32_t ipv4_to_ineta(char* ip) {
     struct in_addr addr;
 
     if (inet_aton(ip, &addr) != 1) {
-        fprintf(stderr, "ERR: failed to parse ip addr %s\n", ip);
+        eprintf("failed to parse ip addr %s\n", ip);
         return 0;
     }
     return addr.s_addr;;
@@ -168,3 +176,4 @@ char *get_tunnel_name(uint8_t tunnel) {
             mac[3], mac[4], mac[5]);   \
     eth;                               \
 })
+

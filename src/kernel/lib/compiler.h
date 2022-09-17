@@ -7,17 +7,23 @@
  */
 #pragma once
 
-#ifndef __INLINE_H__
-#define __INLINE_H__
+#ifndef __COMPILER_H__
+#define __COMPILER_H__
 
 #ifndef __inline
 #define __inline inline __attribute__((always_inline))
 #endif
 
-#define __ALWAYS_INLINE__ __attribute__((__always_inline__))
-
 #ifndef __ALWAYS_INLINE__
 #define __ALWAYS_INLINE__ __attribute__((__always_inline__))
+#endif
+
+#ifndef likely
+# define likely(x)      __builtin_expect(!!(x), 1)
+#endif
+
+#ifndef unlikely
+# define unlikely(x)    __builtin_expect(!!(x), 0)
 #endif
 
 #endif

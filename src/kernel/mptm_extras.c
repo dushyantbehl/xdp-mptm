@@ -20,16 +20,16 @@ struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
     .max_entries = MAX_ENTRIES,
 };
 
-SEC("mptm_redirect")
-int  xdp_prog_redirect(struct xdp_md *ctx) {
+SEC("mptm_redirect_xdp")
+int mptm_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
 
     return bpf_redirect_map(&mptm_redirect_devmap, key, flags);
 }
 
-SEC("mptm_pass")
-int mptm_xdp_pass_func(struct xdp_md *ctx) {
+SEC("mptm_pass_xdp")
+int mptm_pass(struct xdp_md *ctx) {
     return XDP_PASS;
 }
 

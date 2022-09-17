@@ -27,7 +27,7 @@
 
 #include <common/rewrite_helpers.h>
 
-#include <kernel/lib/inline.h>
+#include <kernel/lib/compiler.h>
 #include <kernel/lib/map-defs.h>
 #include <kernel/lib/geneve.h>
 #include <kernel/lib/mptm-debug.h>

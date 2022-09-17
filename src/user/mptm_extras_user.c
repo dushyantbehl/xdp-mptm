@@ -56,22 +56,22 @@ int parse_params(int argc, char *argv[]) {
             } else if(strcmp(optarg, "DEL") == 0) {
                 action = MAP_DELETE;
             } else {
-                fprintf(stderr, "INVALID value for action -a %s\n", optarg);
+                eprintf("INVALID value for action -a %s\n", optarg);
                 return -1;
             }
             break;
         default:
-            fprintf(stderr, "INVALID parameter supplied %c \n", opt);
+            eprintf("INVALID parameter supplied %c \n", opt);
             return -1;
       }
     }
 
     if (action == MAP_ADD && (ingress_iface == -1 || redirect_iface == -1)) {
-        fprintf(stderr, "Need all parameters for ADD\n");
+        eprintf("Need all parameters for ADD\n");
         // for ADD we need capture iface and iface with redirect iface id.
         return -1;
     } else if(action == MAP_DELETE && ingress_iface == -1 ) {
-        fprintf(stderr, "Need ingress iface for DELETE\n");
+        eprintf("Need ingress iface for DELETE\n");
         // for delete we only need the iface which is they key in map
         return -1;
     }
@@ -82,7 +82,7 @@ int parse_params(int argc, char *argv[]) {
 int main(int argc, char **argv) {
 
     if (parse_params(argc, argv) != 0) {
-        fprintf(stderr, "ERR: parsing params\n");
+        eprintf("error parsing params\n");
         print_usage();
         exit(EXIT_FAILURE);
     }
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     /* Make map for redirection port entries */
     int redirect_map_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_DEVMAP);
     if (redirect_map_fd < 0) {
-        fprintf(stderr, "ERR: opening redirect map\n");
+        eprintf("error opening redirect map\n");
         return EXIT_FAIL_BPF;
     }
     printf("ingress iface:%d, redirect iface:%d, action:%s\n",
@@ -99,3 +99,4 @@ int main(int argc, char **argv) {
     return update_map(redirect_map_fd, action, &ingress_iface,
                       &redirect_iface, 0, REDIRECT_DEVMAP);
 }
+
