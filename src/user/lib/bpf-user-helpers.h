@@ -81,7 +81,8 @@ int update_map(int mapfd, int action, void *key, void *value,
         ret = bpf_map_delete_elem(mapfd, key);
         break;
       case MAP_ADD:
-        printf("action is add, adding %s entry\n", map_name);
+        printf("action is add, map fd %d adding %s entry\n",mapfd, map_name);
+        printf("key is %d, value is %d\n",*(uint32_t *)key, *(uint32_t *)value);
         ret = bpf_map_update_elem(mapfd, key, value, flags);
         break;
     }
@@ -165,7 +166,7 @@ char *get_tunnel_name(uint8_t tunnel) {
  */
 #define decode_ipv4(ip) ({           \
     struct in_addr ip_addr;          \
-    ip_addr.s_addr = __bswap_32(ip); \
+    ip_addr.s_addr = (u_int32_t)ip;  \
     inet_ntoa(ip_addr);              \
 })
 
@@ -176,4 +177,5 @@ char *get_tunnel_name(uint8_t tunnel) {
             mac[3], mac[4], mac[5]);   \
     eth;                               \
 })
+
 
