@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2->0 
+/* SPDX-License-Identifier: GPL-2.0 
  *  
  * Authors:
  * Dushyant Behl <dushyantbehl@in.ibm.com>

@@ -47,6 +47,8 @@ typedef struct {
     u_int8_t debug;
     u_int8_t tunnel;
     u_int8_t redirect;
+    char inner_src_addr[16];
+    char inner_dst_addr[16];
 
     /* Map file descriptors and keys used for the maps */
     int tunnel_map_fd;
@@ -71,6 +73,8 @@ void  print_usage() {
          "\t\t -d/--dest_ip <dest-ip e.g. 10.1.1.1>\n"
          "\t\t -D/--dest_mac <dest-mac e.g. aa:bb:cc:dd:ee:ff>\n"
          "\t\t -M/--inner_dest_mac <inner-dest-mac e.g. aa:bb:cc:dd:ee:ff>\n"
+         "\t\t -x/--inner_src_ip <inner-src-ip e.g. 10.250.1.1>\n"
+         "\t\t -x/--inner_dst_ip <inner-dst-ip e.g. 10.250.1.2>\n"
          "\t common options:-\n"
          "\t\t -r/--redirect <1 or 0>\n"
          "\t\t -L/--vpeer_iface <dev-num>\n"
@@ -99,6 +103,8 @@ static const struct option long_options[] = {
         {"dest_mac",       required_argument, NULL, 'D'}, //"Destination MAC addr of <redirect-dev>", "<mac>", true},
         {"inner_dest_mac", required_argument, NULL, 'M'}, //"Inner Destination MAC address", "<mac>", true},
         {"enable_logs",    required_argument, NULL, 'l'},
+        {"inner_src_ip",   required_argument, NULL, 'x'}, //source ip of the container.
+        {"inner_dst_ip",   required_argument, NULL, 'y'}, //dest ip of the container.
         {0, 0, NULL, 0}
 };
 
@@ -107,7 +113,7 @@ int verify_args(mptm_info *mptm) {
     int action = mptm->action;
 
     // Key is always needed.
-    if (mptm->source_addr[0] == '\0' || mptm->dest_addr[0] == '\0') {
+    if (mptm->inner_src_addr[0] == '\0' || mptm->inner_dst_addr[0] == '\0') {
         eprintf("source_addr and dest_addr form the key and are not provided\n");
         return -1;
     }
@@ -249,6 +255,10 @@ int parse_params(int argc, char *argv[], mptm_info *mptm) {
             break;
         case 'M' : strncpy(mptm->inner_dest_mac, optarg, 18);
             break;
+        case 'x' : strncpy(mptm->inner_src_addr, optarg, 16);
+            break;
+        case 'y' : strncpy(mptm->inner_dst_addr, optarg, 16);
+            break;
         case 'l' :
             if (!optarg) {
                 mptm->debug = 0;
@@ -265,34 +275,6 @@ int parse_params(int argc, char *argv[], mptm_info *mptm) {
     return verify_args(mptm);
 }
 
-static inline uint32_t get_if_devmap_map_key(mptm_info *mptm) {
-    // Look into the redirect_map, id zero should contain the counter
-    // Increament the counter and that forms the new key for redirect_if_devmap
-    int ret;
-
-    redirect_map_key_t primary_key = 0;
-    uint32_t counter;
-
-    ret = lookup_map(mptm->redirect_map_fd, &primary_key, &counter, REDIRECT_INFO_MAP);
-    if (ret != EXIT_OK) {
-        printf("failed to lookup counter, initializing value to 1\n");
-        // Initialize counter as 1 and set for the key.
-        counter = 1;
-    } else {
-        printf("found counter %d....",counter);
-        counter += 1;
-        printf("now set to %d\n",counter);
-    }
-
-    ret = update_map(mptm->redirect_map_fd, MAP_ADD, &primary_key, &counter, 0, REDIRECT_INFO_MAP);
-    if (ret != EXIT_OK) {
-        eprintf("failed to add redirect if\n");
-        return ret;
-    }
-
-    return counter;
-}
-
 static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
     tunnel_map_key_t *key = (tunnel_map_key_t *)malloc(sizeof(tunnel_map_key_t));;
 
@@ -302,8 +284,8 @@ static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool 
      key is constructed by using the saddr and daddr directly from
      the packet and hence saves us two bswaps on each packet.
     */
-    uint32_t s_addr = ipv4_to_ineta(mptm->source_addr);
-    uint32_t d_addr = ipv4_to_ineta(mptm->dest_addr);
+    uint32_t s_addr = ipv4_to_ineta(mptm->inner_src_addr);
+    uint32_t d_addr = ipv4_to_ineta(mptm->inner_dst_addr);
 
     if (inverted) {
         key->s_addr = d_addr;
@@ -319,9 +301,9 @@ static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool 
 static inline redirect_map_key_t *__get_redirect_map_key(mptm_info *mptm, bool inverted) {
     redirect_map_key_t *key = (redirect_map_key_t *)malloc(sizeof(redirect_map_key_t));
     if (inverted) {
-        *key = ipv4_to_ineta(mptm->source_addr);
+        *key = ipv4_to_ineta(mptm->inner_src_addr);
     } else {
-        *key = ipv4_to_ineta(mptm->dest_addr);
+        *key = ipv4_to_ineta(mptm->inner_dst_addr);
     }
     return key;
 }
@@ -449,10 +431,10 @@ int do_get(mptm_info *mptm) {
 
     dump_tunnel_info(ti);
 
-    printf("Ingrese redirect if for key %s, %s to %s is %d\n", decode_ipv4(*(mptm->redirect_key)),
-            mptm->source_addr, mptm->dest_addr, ingress_redirect_if);
-    printf("Egrese redirect if for key %s, %s to %s is %d\n", decode_ipv4(*(mptm->redirect_key_inv)),
-            mptm->dest_addr, mptm->source_addr, egress_redirect_if);
+    printf("Ingrese redirect iface for key %s is %d\n",
+            decode_ipv4(*(mptm->redirect_key)), ingress_redirect_if);
+    printf("Egrese redirect iface for key %s is %d\n",
+            decode_ipv4(*(mptm->redirect_key_inv)), egress_redirect_if);
 
     return EXIT_OK;
 }
@@ -528,6 +510,7 @@ int do_add(mptm_info *mptm) {
 
 int main(int argc, char **argv) {
 
+    int ret;
     mptm_info *mptm = (mptm_info *)malloc(sizeof(mptm_info));
 
     if (parse_params(argc, argv, mptm) != 0) {
@@ -576,8 +559,6 @@ int main(int argc, char **argv) {
     if (mptm->redirect_key_inv == NULL) {
       eprintf("cannot create inverse redirect key\n");
     }
- 
-    int ret = EXIT_OK;
 
     switch (mptm->action)
     {
