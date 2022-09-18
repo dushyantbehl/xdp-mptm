@@ -8,8 +8,6 @@ For detailed description of depedencies, intent, usage etc. please check the blo
 1. [Towards building an eBPF Based Network Data Plane](https://medium.com/@palani.kodeswaran/towards-building-a-ebpf-based-network-datapath-f6135067c03e)
 1. [Towards building an eBPF based Newtork Data plane: Part 2](https://medium.com/@palani.kodeswaran/towards-an-ebpf-based-datapath-part-2-2afd10ada603)
 
-This code is built on top of the [XDP Tutorial](https://github.com/xdp-project/xdp-tutorial).
-
 ## Based on libbpf
 
 This XDP-tutorial leverages [libbpf](https://github.com/libbpf/libbpf/).
