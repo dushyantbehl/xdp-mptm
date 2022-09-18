@@ -21,11 +21,11 @@ Run ``make`` in root folder.
 # How to Run
 ![System setup for testing](docs/setup.png "System setup for testing")
 
-We provide 2 files to setup system according to the architecture above
+We provide setup files to create system according to the picture above
 
-[setup-node1.sh](./setup/setup-node1.sh) is for setting up Node 1 while,
+[setup-node.sh](./setup/setup-node.sh) is the script which contains bash script to setup system.
 
-[setup-node2.sh](./setup/setup-node2.sh) is for setting up Node 2.
+[env-node1.sh](./setup/env-node1.sh) [env-node2.sh](./setup/env-node2.sh) is the environment to set them up.
 
 
 ## Attaching MPTM implementation to interfaces:
@@ -74,7 +74,7 @@ $ ip a | ack --passthru 'xdp'
        valid_lft forever preferred_lft forever
 ```
 
-Note:- If we need to perform redirect from veth to eth0 interface, we need to attach an XDP_PASS program on the eth0 interface.
+Note:- If we need to perform redirect from `veth` to `eth0` interface, we need to attach an `XDP_PASS` program on the `eth0` interface.
 
 ```
 $ bpftool net attach xdp id 661 dev ens4f0 overwrite
@@ -157,6 +157,38 @@ action is add, map fd 4 adding mptm_redirect_info_map entry
 action is add, map fd 5 adding mptm_redirect_if_devmap entry
 ```
 
+```
+$ ./build/mptm_user --enable_logs 0 --redirect 1 --eth0_iface 2 --veth_iface 146 --vpeer_iface 145 --flags 0 --tunnel GENEVE --vlid 0 --source_port 51234 --source_ip 10.30.30.1 --source_mac 68:05:ca:d4:7c:ac --dest_ip 10.30.30.2 --dest_mac 68:05:ca:d4:5c:28 --inner_dest_mac 9e:5c:c2:da:ee:5b --inner_src_ip 10.250.1.100 --inner_dst_ip 10.250.1.101 -a ADD
+opt: l arg: 0 
+opt: r arg: 1 
+opt: Z arg: 2 
+opt: Y arg: 146 
+opt: X arg: 145 
+opt: f arg: 0 
+opt: t arg: GENEVE 
+opt: v arg: 0 
+opt: p arg: 51234 
+opt: s arg: 10.30.30.1 
+opt: S arg: 68:05:ca:d4:7c:ac 
+opt: d arg: 10.30.30.2 
+opt: D arg: 68:05:ca:d4:5c:28 
+opt: M arg: 9e:5c:c2:da:ee:5b 
+opt: x arg: 10.250.1.100 
+opt: y arg: 10.250.1.101 
+opt: a arg: ADD 
+Arguments verified
+Opened bpf map file /sys/fs/bpf/mptm_tunnel_info_map at fd 3
+Opened bpf map file /sys/fs/bpf/mptm_redirect_info_map at fd 4
+Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 5
+Creating tunnel info object......created
+action is add, map fd 3 adding mptm_tunnel_info_map entry
+action is add, map fd 4 adding mptm_redirect_info_map entry
+action is add, map fd 5 adding mptm_redirect_if_devmap entry
+action is add, map fd 4 adding mptm_redirect_info_map entry
+action is add, map fd 5 adding mptm_redirect_if_devmap entry
+
+```
+
 Check if map entry got created by - 
 
 ```
@@ -200,9 +232,9 @@ and so on...
 You can also view the entries which got added by running a lookup via `mptm_user`
 
 ```
-$ ./build/mptm_user --source_ip 10.30.30.1 --dest_ip 10.30.30.2 -a GET
-opt: s arg: 10.30.30.1 
-opt: d arg: 10.30.30.2 
+$ ./build/mptm_user --inner_src_ip 10.250.1.100 --inner_dst_ip 10.250.1.101 -a GET
+opt: x arg: 10.250.1.100 
+opt: y arg: 10.250.1.101 
 opt: a arg: GET 
 Arguments verified
 Opened bpf map file /sys/fs/bpf/mptm_tunnel_info_map at fd 3
@@ -221,17 +253,18 @@ Tunnel info element - {
         dest_addr = 10.30.30.2
         source_addr = 10.30.30.1
 }
-Ingrese redirect if for key 10.30.30.2, 10.30.30.1 to 10.30.30.2 is 2
-Egrese redirect if for key 10.30.30.1, 10.30.30.2 to 10.30.30.1 is 146
+Ingrese redirect iface for key 10.250.1.101 is 2
+Egrese redirect iface for key 10.250.1.100 is 146
 ```
 
 In case you need to delete the entry action can be set to `DEL`
 
 ```
-$ ./build/mptm_user --source_ip 10.30.30.1 --dest_ip 10.30.30.2 -a DEL
+$ ./build/mptm_user --inner_src_ip 10.250.1.100 --inner_dst_ip 10.250.1.101 -a DEL
 ```
 
 Add an entry to the redirect map for reverse path traffic as,
+
 `mptm_extras_user -i IFACE_ID_OF_GENEVE0_NODE1 -r IFACE_ID_OF_VETH_NODE1_ROOTNS -o ADD`
 
 ```
@@ -244,38 +277,36 @@ action is add, map fd 3 adding redirect_devmap entry
 ```
 
 ## Generating Traffic:
-
 ```
 ip netns exec vns1 ping 10.250.1.101
 ```
 
 ## Show packets coming on xdp interface
-
 ```
 $ xdpdump -i veth-node1 -x --rx-capture entry,exit
 ```
 
 # License
-
 Our program is present under GPL 2.0 license.
+
 If separate license terms are needed for any file it is mentioned on top of the file.
 
 # Extra
 
-Command to flush iptables completely
+1. Command to flush iptables completely
 
 ```
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 
 ```
 
-If the `libbpf` library doesn't load then to pass shared libary to the binary at runtime you can use this command,
+1. If the `libbpf` library doesn't load then to pass shared libary to the binary at runtime you can use this command,
 ```
 export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
 ```
 run from inside the root directory of project.
 
-ip tables command to add checksum fill inside the container.
+1. ip tables command to add checksum fill inside the container.
 ```
 iptables -A POSTROUTING -j CHECKSUM --checksum-fill
 ```
