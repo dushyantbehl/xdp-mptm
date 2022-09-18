@@ -499,9 +499,6 @@ int do_add(mptm_info *mptm) {
     uint32_t ingress_if = mptm->veth_iface;
     uint32_t egress_if = mptm->eth0_iface;
 
-    printf("ingress_if is %d\n",ingress_if);
-    printf("egress_if is %d\n",egress_if);
-
     ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, &ingress_if, 0, REDIRECT_INFO_MAP);
     if (ret != EXIT_OK) {
         eprintf("failed to add redirect ingress counter\n");

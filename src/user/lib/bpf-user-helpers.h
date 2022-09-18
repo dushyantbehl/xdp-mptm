@@ -82,7 +82,6 @@ int update_map(int mapfd, int action, void *key, void *value,
         break;
       case MAP_ADD:
         printf("action is add, map fd %d adding %s entry\n",mapfd, map_name);
-        printf("key is %d, value is %d\n",*(uint32_t *)key, *(uint32_t *)value);
         ret = bpf_map_update_elem(mapfd, key, value, flags);
         break;
     }
