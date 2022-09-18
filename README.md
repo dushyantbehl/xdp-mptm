@@ -278,20 +278,22 @@ If separate license terms are needed for any file it is mentioned on top of the 
 
 # Extra
 
-1. Command to flush iptables completely
+* Command to flush iptables completely
 
 ```
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
-
 ```
 
-1. If the `libbpf` library doesn't load then to pass shared libary to the binary at runtime you can use this command,
+* If the `libbpf` library doesn't load then to pass shared libary to the binary at runtime you can use this command,
+
 ```
 export LD_LIBRARY_PATH=${PWD}/deps/libbpf/src
 ```
+
 run from inside the root directory of project.
 
-1. ip tables command to add checksum fill inside the container.
+* ip tables command to add checksum fill inside the container.
+
 ```
 iptables -A POSTROUTING -j CHECKSUM --checksum-fill
 ```
