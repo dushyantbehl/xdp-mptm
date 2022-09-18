@@ -119,7 +119,7 @@ mptm  mptm_extras  mptm_redirect_if_devmap  mptm_redirect_info_map  mptm_tunnel_
 ```
 
 We need to populate the maps with information regarding tunnel outer packet header, ip address to mangle, mac addresses and interfaces to look for.
-We will use the [`mptm_user`](./src/user/mptm_user.c  binary we compiled in the [build](#build) step to do that.
+We will use the [`mptm_user`](./src/user/mptm_user.c)  binary we compiled in the [build](#build) step to do that.
 
 The binary `mptm_user` needs [libbpf](./deps/libbpf/) shared library for running which gets compiled on your system the
 first time you run `make`.
@@ -127,36 +127,23 @@ first time you run `make`.
 The command is run as,
 
 ```
-$ ./build/mptm_user --enable_logs 0 --redirect 1 --eth0_iface 2 --veth_iface 146 --vpeer_iface 145 --flags 0 --tunnel GENEVE --vlid 0 --source_port 51234 --source_ip 10.30.30.1 --source_mac 68:05:ca:d4:7c:ac --dest_ip 10.30.30.2 --dest_mac 68:05:ca:d4:5c:28 --inner_dest_mac 9e:5c:c2:da:ee:5b -a ADD
-opt: l arg: 0 
-opt: r arg: 1 
-opt: Z arg: 2 
-opt: Y arg: 146 
-opt: X arg: 145 
-opt: f arg: 0 
-opt: t arg: GENEVE 
-opt: v arg: 0 
-opt: p arg: 51234 
-opt: s arg: 10.30.30.1 
-opt: S arg: 68:05:ca:d4:7c:ac 
-opt: d arg: 10.30.30.2 
-opt: D arg: 68:05:ca:d4:5c:28 
-opt: M arg: 9e:5c:c2:da:ee:5b 
-opt: a arg: ADD 
-Arguments verified
-Opened bpf map file /sys/fs/bpf/mptm_tunnel_info_map at fd 3
-Opened bpf map file /sys/fs/bpf/mptm_redirect_info_map at fd 4
-Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 5
-Creating tunnel info object......created
-action is add, map fd 3 adding mptm_tunnel_info_map entry
-action is add, map fd 4 adding mptm_redirect_info_map entry
-action is add, map fd 5 adding mptm_redirect_if_devmap entry
-action is add, map fd 4 adding mptm_redirect_info_map entry
-action is add, map fd 5 adding mptm_redirect_if_devmap entry
-```
-
-```
-$ ./build/mptm_user --enable_logs 0 --redirect 1 --eth0_iface 2 --veth_iface 146 --vpeer_iface 145 --flags 0 --tunnel GENEVE --vlid 0 --source_port 51234 --source_ip 10.30.30.1 --source_mac 68:05:ca:d4:7c:ac --dest_ip 10.30.30.2 --dest_mac 68:05:ca:d4:5c:28 --inner_dest_mac 9e:5c:c2:da:ee:5b --inner_src_ip 10.250.1.100 --inner_dst_ip 10.250.1.101 -a ADD
+$ ./build/mptm_user --enable_logs 0 \
+                    --redirect 1 \
+                    --eth0_iface 2 \
+                    --veth_iface 146 \
+                    --vpeer_iface 145 \
+                    --flags 0 \
+                    --tunnel GENEVE \
+                    --vlid 0 \
+                    --source_port 51234 \
+                    --source_ip 10.30.30.1 \
+                    --source_mac 68:05:ca:d4:7c:ac \
+                    --dest_ip 10.30.30.2 \
+                    --dest_mac 68:05:ca:d4:5c:28 \
+                    --inner_dest_mac 9e:5c:c2:da:ee:5b \
+                    --inner_src_ip 10.250.1.100 \
+                    --inner_dst_ip 10.250.1.101 \
+                    -a ADD
 opt: l arg: 0 
 opt: r arg: 1 
 opt: Z arg: 2 
