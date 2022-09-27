@@ -40,6 +40,8 @@ typedef struct tunnel_info {
     __u8 tunnel_type;
     __u8 redirect;
     __u16 flags;
+    __u32 eth0_iface;
+    __u32 veth_iface;
     union {
         struct geneve_info geneve;
         struct vxlan_info vxlan;

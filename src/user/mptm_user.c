@@ -22,13 +22,10 @@
 
 // TODO: make sure this can be overridden using env or argument
 #define TUNNEL_INFO_MAP     "mptm_tunnel_info_map"
-#define REDIRECT_INFO_MAP   "mptm_redirect_info_map"
 #define REDIRECT_IF_DEVMAP  "mptm_redirect_if_devmap"
 
 #define TUNNEL_INFO_KEY(mptm)          __get_tunnel_info_map_key(mptm, false)
 #define TUNNEL_INFO_KEY_INV(mptm)      __get_tunnel_info_map_key(mptm, true)
-#define REDIRECT_INFO_KEY(mptm)        __get_redirect_map_key(mptm, false)
-#define REDIRECT_INFO_KEY_INV(mptm)    __get_redirect_map_key(mptm, true)
 
 typedef struct {
     /* Arguments for the tunnels */
@@ -52,11 +49,8 @@ typedef struct {
 
     /* Map file descriptors and keys used for the maps */
     int tunnel_map_fd;
-    int redirect_map_fd;
     int redirect_if_devmap_fd;
     tunnel_map_key_t *tun_key;
-    redirect_map_key_t *redirect_key;
-    redirect_map_key_t *redirect_key_inv;
 } mptm_info;
 
 void  print_usage() {
@@ -298,16 +292,6 @@ static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool 
     return key;
 }
 
-static inline redirect_map_key_t *__get_redirect_map_key(mptm_info *mptm, bool inverted) {
-    redirect_map_key_t *key = (redirect_map_key_t *)malloc(sizeof(redirect_map_key_t));
-    if (inverted) {
-        *key = ipv4_to_ineta(mptm->inner_src_addr);
-    } else {
-        *key = ipv4_to_ineta(mptm->inner_dst_addr);
-    }
-    return key;
-}
-
 mptm_tunnel_info* create_tun_info(mptm_info *mptm) {
 
     mptm_tunnel_info *tn = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
@@ -316,6 +300,9 @@ mptm_tunnel_info* create_tun_info(mptm_info *mptm) {
     tn->tunnel_type = mptm->tunnel;
     tn->redirect = mptm->redirect;
     tn->flags = mptm->flags;
+
+    tn->eth0_iface = mptm->eth0_iface;
+    tn->veth_iface = mptm->veth_iface;
 
     switch (mptm->tunnel) {
     case VLAN: {
@@ -367,6 +354,8 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("\tdebug = %u\n", tn->debug);
     printf("\tredirect = %u\n", tn->redirect);
     printf("\tflags = %u\n", tn->flags);
+    printf("\eth0_iface = %d\n", tn->eth0_iface);
+    printf("\veth_iface = %d\n", tn->veth_iface);
     printf("\ttunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
     switch (tn->tunnel_type)
     {
@@ -382,8 +371,8 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
         printf("\tsource_mac = %s\n", decode_mac(geneve->source_mac));
         printf("\touter_dest_mac = %s\n", decode_mac(geneve->dest_mac));
         printf("\tinner_dest_mac = %s\n", decode_mac(geneve->inner_dest_mac));
-        printf("\tdest_addr = %s\n", decode_ipv4(geneve->dest_addr));
-        printf("\tsource_addr = %s\n", decode_ipv4(geneve->source_addr));
+        printf("\tdest_ip = %s\n", decode_ipv4(geneve->dest_addr));
+        printf("\tsource_ip = %s\n", decode_ipv4(geneve->source_addr));
     }
     break;
     default:
@@ -395,7 +384,6 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
 
 int do_get(mptm_info *mptm) {
     int ret;
-    uint32_t ingress_if, egress_if;
     uint32_t ingress_redirect_if, egress_redirect_if;
     mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
 
@@ -405,25 +393,13 @@ int do_get(mptm_info *mptm) {
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key, &ingress_if, REDIRECT_INFO_MAP);
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &mptm->veth_iface, &egress_redirect_if, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to lookup redirect ingress interface\n");
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_if_devmap_fd, &ingress_if, &ingress_redirect_if, REDIRECT_IF_DEVMAP);
-    if (ret != EXIT_OK) {
-        eprintf("failed to lookup redirect ingress counter\n");
-        return ret;
-    }
-
-    ret = lookup_map(mptm->redirect_map_fd, mptm->redirect_key_inv, &egress_if, REDIRECT_INFO_MAP);
-    if (ret != EXIT_OK) {
-        eprintf("failed to lookup redirect egress counter\n");
-        return ret;
-    }
-
-    ret = lookup_map(mptm->redirect_if_devmap_fd, &egress_if, &egress_redirect_if, REDIRECT_IF_DEVMAP);
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &mptm->eth0_iface, &ingress_redirect_if, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to lookup redirect egress interface\n");
         return ret;
@@ -431,10 +407,10 @@ int do_get(mptm_info *mptm) {
 
     dump_tunnel_info(ti);
 
-    printf("Ingrese redirect iface for key %s is %d\n",
-            decode_ipv4(*(mptm->redirect_key)), ingress_redirect_if);
-    printf("Egrese redirect iface for key %s is %d\n",
-            decode_ipv4(*(mptm->redirect_key_inv)), egress_redirect_if);
+    printf("Ingrese redirect is from iface %d to %d\n",
+            mptm->veth_iface, egress_redirect_if);
+    printf("Egrese redirect is from iface %d to %dn",
+            mptm->eth0_iface, ingress_redirect_if);
 
     return EXIT_OK;
 }
@@ -442,19 +418,22 @@ int do_get(mptm_info *mptm) {
 int do_delete(mptm_info *mptm) {
     int ret;
 
+    uint32_t ingress_if = mptm->veth_iface;
+    uint32_t egress_if = mptm->eth0_iface;
+
     ret = update_map(mptm->tunnel_map_fd, MAP_DELETE, mptm->tun_key, NULL, 0, TUNNEL_INFO_MAP);
     if (ret != EXIT_OK) {
         eprintf("failed to delete tunnel info\n");
         return ret;
     }
-    ret = update_map(mptm->redirect_map_fd, MAP_DELETE, mptm->redirect_key, NULL, 0, REDIRECT_INFO_MAP);
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_DELETE, &ingress_if, NULL, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
-        eprintf("failed to delete redirect info\n");
+        eprintf("failed to delete ingress_if redirect info\n");
         return ret;
     }
-    ret = update_map(mptm->redirect_map_fd, MAP_DELETE, mptm->redirect_key_inv, NULL, 0, REDIRECT_INFO_MAP);
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_DELETE, &egress_if, NULL, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
-        eprintf("failed to delete redirect info inv\n");
+        eprintf("failed to delete egress_if redirect info\n");
         return ret;
     }
     return EXIT_OK;
@@ -481,25 +460,13 @@ int do_add(mptm_info *mptm) {
     uint32_t ingress_if = mptm->veth_iface;
     uint32_t egress_if = mptm->eth0_iface;
 
-    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key, &ingress_if, 0, REDIRECT_INFO_MAP);
-    if (ret != EXIT_OK) {
-        eprintf("failed to add redirect ingress counter\n");
-        return ret;
-    }
-
-    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &ingress_if, &mptm->eth0_iface, 0, REDIRECT_IF_DEVMAP);
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &ingress_if, &egress_if, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to add redirect if\n");
         return ret;
     }
 
-    ret = update_map(mptm->redirect_map_fd, MAP_ADD, mptm->redirect_key_inv, &egress_if, 0, REDIRECT_INFO_MAP);
-    if (ret != EXIT_OK) {
-        eprintf("failed to add redirect egress counter\n");
-        return ret;
-    }
-
-    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &egress_if, &mptm->veth_iface, 0, REDIRECT_IF_DEVMAP);
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &egress_if, ingress_if, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to add inverse redirect if\n");
         return ret;
@@ -528,14 +495,6 @@ int main(int argc, char **argv) {
     printf("Opened bpf map file %s/%s at fd %d\n", PIN_BASE_DIR, TUNNEL_INFO_MAP, tunnel_map_fd);
 
     /* Open the map for geneve config */
-    int redirect_map_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_INFO_MAP);
-    if (redirect_map_fd < 0) {
-          eprintf("cannot open redirect info map\n");
-        return EXIT_FAIL_BPF;
-    }
-    printf("Opened bpf map file %s/%s at fd %d\n", PIN_BASE_DIR, REDIRECT_INFO_MAP, redirect_map_fd);
-
-    /* Open the map for geneve config */
     int redirect_if_devmap_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_IF_DEVMAP);
     if (redirect_map_fd < 0) {
           eprintf("cannot open redirect if devmap\n");
@@ -544,20 +503,11 @@ int main(int argc, char **argv) {
     printf("Opened bpf map file %s/%s at fd %d\n", PIN_BASE_DIR, REDIRECT_IF_DEVMAP, redirect_if_devmap_fd);
 
     mptm->tunnel_map_fd = tunnel_map_fd;
-    mptm->redirect_map_fd = redirect_map_fd;
     mptm->redirect_if_devmap_fd = redirect_if_devmap_fd;
 
     mptm->tun_key = TUNNEL_INFO_KEY(mptm);
     if (mptm->tun_key == NULL) {
       eprintf("cannot create tunnel key\n");
-    }
-    mptm->redirect_key = REDIRECT_INFO_KEY(mptm);
-    if (mptm->redirect_key == NULL) {
-      eprintf("cannot create reverse key\n");
-    }
-    mptm->redirect_key_inv = REDIRECT_INFO_KEY_INV(mptm);
-    if (mptm->redirect_key_inv == NULL) {
-      eprintf("cannot create inverse redirect key\n");
     }
 
     switch (mptm->action)

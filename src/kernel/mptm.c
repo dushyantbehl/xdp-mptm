@@ -41,13 +41,6 @@ struct bpf_map_def SEC("maps") mptm_tunnel_info_map = {
     .max_entries = MAX_ENTRIES,
 };
 
-struct bpf_map_def SEC("maps") mptm_tunnel_redirect_map = {
-    .type        = BPF_MAP_TYPE_HASH,
-    .key_size    = sizeof(redirect_map_key_t),
-    .value_size  = sizeof(__u32),
-    .max_entries = MAX_ENTRIES*2,
-};
-
 struct bpf_map_def SEC("maps") mptm_tunnel_redirect_if_devmap = {
     .type        = BPF_MAP_TYPE_DEVMAP,
     .key_size    = sizeof(__u32),
@@ -86,12 +79,6 @@ int mptm_push_tunnel(struct xdp_md *ctx) {
       goto out;
     }
 
-    /* Saved as we might need this as redirect key. 
-     * And the tag push functions modify underlying object
-     * so ip pointer might not hold later.
-     */
-    daddr = ip->daddr; 
-
     tun_type = tn->tunnel_type;
     if (tun_type == VLAN) {
         action = trigger_vlan_push(ctx, eth, tn);
@@ -105,16 +92,7 @@ int mptm_push_tunnel(struct xdp_md *ctx) {
 
     if (likely(tn->redirect)) {
         __u64 flags = 0; // keep redirect flags zero for now
-        __u32 *counter;
-
-        redirect_map_key_t redirect_key = daddr;
-        counter = bpf_map_lookup_elem(&mptm_tunnel_redirect_map, &redirect_key);
-        if(counter == NULL) {
-            bpf_debug("[ERR] map entry missing for redirect key %d\n", redirect_key);
-            goto out;
-        }
-
-        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, *counter, flags);
+        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, tn->veth_iface, flags);
     }
 
   out:
@@ -125,22 +103,11 @@ SEC("mptm_pop_xdp")
 int mptm_pop_tunnel(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
 
-    /*
-       If packet is ENCAPSULATED
-       Check packet tunnel - VLAN? GENEVE? VXLAN? ETC?
-       check inner destination of packet
-       use inner destination ip as the key in the tunnel iface map
-       if present then do decap and send to the ingress interface present
-       in the tunnel map
-    */
-
     /* header pointers */
     struct ethhdr *eth;
     struct iphdr *ip;
     struct udphdr *udp;
-
-    __u32 saddr;
-    __u32 daddr;
+    tunnel_map_key_t key;
 
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
@@ -148,15 +115,11 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
     if (parse_pkt_headers(data, data_end, &eth, &ip, &udp) != 0)
         goto out;
 
-     /* Saved as we need these later 
-     * And the head modification functions modify underlying object
-     * so ip pointer might not hold later.
-     */
-    saddr = ip->saddr;
-    daddr = ip->daddr;
+    /* Packet is coming from outside so source and dest must be inversed */
+    key.s_addr = daddr;
+    key.d_addr = saddr;
 
-    if (udp->dest == BE_GEN_DSTPORT) {
-        // GENEVE packet
+    if (udp->dest == BE_GEN_DSTPORT) { // GENEVE packet
         // Check inner packet if there is a rule corresponding to
         // inner source which will be source for us as we received the packet
         int outer_hdr_size = sizeof(struct genevehdr) +
@@ -182,12 +145,8 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
 
         /* map values and tunnel informations */
         struct tunnel_info* tn;
-        tunnel_map_key_t key;
         __u8 tun_type;
-
-        /* Packet is coming from outside so source and dest must be inversed */
-        key.s_addr = daddr;
-        key.d_addr = saddr;
+        __u64 flags = 0; // keep redirect flags zero for now
 
         tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
         if(tn == NULL) {
@@ -196,25 +155,13 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
         }
 
         tun_type = tn->tunnel_type;
-        if (tun_type != GENEVE) {
+        if (unlikely(tun_type != GENEVE)) {
             mptm_print("Packet is changed but did not belong to us!");
             return XDP_DROP;
         }
 
-        __u64 flags = 0; // keep redirect flags zero for now
-        __u32 *counter;
-
-        redirect_map_key_t redirect_key = daddr;
-        counter = bpf_map_lookup_elem(&mptm_tunnel_redirect_map, &redirect_key);
-        if(counter == NULL) {
-            bpf_debug("[ERR] map entry missing for inverse redirect key %d\n", redirect_key);
-            goto out;
-        }
-
-        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, *counter, flags);
+        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, tn->eth0_iface, flags);
     }
-
-    goto out;
 
   out:
     return xdp_stats_record_action(ctx, action);
