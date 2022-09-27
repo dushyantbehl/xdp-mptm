@@ -34,22 +34,22 @@
 
 #define MAX_ENTRIES 1024
 
-struct bpf_map_def SEC("maps") mptm_tunnel_info_map = {
+struct bpf_map_def SEC("maps") mptm_tnl_info_map = {
     .type        = BPF_MAP_TYPE_HASH,
     .key_size    = sizeof(tunnel_map_key_t),
     .value_size  = sizeof(mptm_tunnel_info),
     .max_entries = MAX_ENTRIES,
 };
 
-struct bpf_map_def SEC("maps") mptm_tunnel_redirect_if_devmap = {
+struct bpf_map_def SEC("maps") mptm_tnl_redirect_devmap = {
     .type        = BPF_MAP_TYPE_DEVMAP,
     .key_size    = sizeof(__u32),
     .value_size  = sizeof(__u32),
     .max_entries = MAX_ENTRIES*2,
 };
 
-SEC("mptm_push_xdp")
-int mptm_push_tunnel(struct xdp_md *ctx) {
+SEC("mptm_encap_xdp")
+int mptm_encap(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
 
     /* header pointers */
@@ -71,7 +71,7 @@ int mptm_push_tunnel(struct xdp_md *ctx) {
     key.s_addr = ip->saddr;
     key.d_addr = ip->daddr;
 
-    tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
+    tn = bpf_map_lookup_elem(&mptm_tnl_info_map, &key);
     if(tn == NULL) {
       mptm_print("[ERR] map entry missing for key-{saddr:%x,daddr:%x}\n",
                  key.s_addr, key.d_addr);
@@ -91,15 +91,15 @@ int mptm_push_tunnel(struct xdp_md *ctx) {
 
     if (likely(tn->redirect)) {
         __u64 flags = 0; // keep redirect flags zero for now
-        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, tn->veth_iface, flags);
+        action = bpf_redirect_map(&mptm_tnl_redirect_devmap, tn->veth_iface, flags);
     }
 
   out:
     return xdp_stats_record_action(ctx, action);
 }
 
-SEC("mptm_pop_xdp")
-int mptm_pop_tunnel(struct xdp_md *ctx) {
+SEC("mptm_decap_xdp")
+int mptm_decap(struct xdp_md *ctx) {
     int action = XDP_PASS;  //default action
 
     /* header pointers */
@@ -147,7 +147,7 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
         key.s_addr = inner_ip->daddr;
         key.d_addr = inner_ip->saddr;
 
-        tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
+        tn = bpf_map_lookup_elem(&mptm_tnl_info_map, &key);
         if(tn == NULL) {
             mptm_print("[ERR] map entry missing for key {saddr:%x,daddr:%x}\n", key.s_addr, key.d_addr);
             goto out;
@@ -159,7 +159,7 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
             return XDP_DROP;
         }
 
-        action = bpf_redirect_map(&mptm_tunnel_redirect_if_devmap, tn->eth0_iface, flags);
+        action = bpf_redirect_map(&mptm_tnl_redirect_devmap, tn->eth0_iface, flags);
     }
 
   out:

@@ -13,7 +13,7 @@
 
 #define MAX_ENTRIES 1024
 
-struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
+struct bpf_map_def SEC("maps") mptm_extras_redirect_devmap = {
     .type        = BPF_MAP_TYPE_DEVMAP,
     .key_size    = sizeof(__u32),
     .value_size  = sizeof(__u32),
@@ -21,15 +21,15 @@ struct bpf_map_def SEC("maps") mptm_redirect_devmap = {
 };
 
 SEC("mptm_redirect_xdp")
-int mptm_redirect(struct xdp_md *ctx) {
+int mptm_extras_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
 
-    return bpf_redirect_map(&mptm_redirect_devmap, key, flags);
+    return bpf_redirect_map(&mptm_extras_redirect_devmap, key, flags);
 }
 
 SEC("mptm_pass_xdp")
-int mptm_pass(struct xdp_md *ctx) {
+int mptm_extras_pass(struct xdp_md *ctx) {
     return XDP_PASS;
 }
 
