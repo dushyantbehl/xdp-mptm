@@ -17,8 +17,6 @@ This XDP-tutorial leverages [libbpf](https://github.com/libbpf/libbpf/).
 Run ``make`` in root folder.
 
 # How to Run
-![System setup for testing](docs/setup.png "System setup for testing")
-
 We provide setup files to create system according to the picture above
 
 [setup-node.sh](./setup/setup-node.sh) is the script which contains bash script to setup system.
@@ -75,8 +73,9 @@ $ ip a | ack --passthru 'xdp'
        valid_lft forever preferred_lft forever
 ```
 
-Note:- As per Netdev 0x13 talk (Veth XDP: XDP for containers)[https://www.files.netdevconf.info/f/a63b274e50f943a0a474/?dl=1] we need to attach an XDP Program to the vpeer and redirect pakcets to veth for optimal performance.
-So we attach `XDP_PASS` to the veth-peer interface as follows.
+Note:- As per [Netdev 0x13](https://legacy.netdevconf.info/0x13/) talk [Veth XDP: XDP for containers](https://www.files.netdevconf.info/f/a63b274e50f943a0a474/?dl=1) we need to attach an XDP Program to the `vpeer` and redirect pakcets to `veth` for optimal performance.
+
+So we attach `XDP_PASS` to the `veth-peer` interface as follows.
 
 ```
 $ ip netns exec vns1 bpftool net attach xdp id 786 dev veth-ns1 overwrite
