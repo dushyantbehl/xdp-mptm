@@ -106,17 +106,12 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
     struct ethhdr *eth;
     struct iphdr *ip;
     struct udphdr *udp;
-    tunnel_map_key_t key;
 
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
 
     if (parse_pkt_headers(data, data_end, &eth, &ip, &udp) != 0)
         goto out;
-
-    /* Packet is coming from outside so source and dest must be inversed */
-    key.s_addr = ip->daddr;
-    key.d_addr = ip->saddr;
 
     if (udp->dest == BE_GEN_DSTPORT) { // GENEVE packet
         // Check inner packet if there is a rule corresponding to
@@ -143,9 +138,14 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
             goto out;
 
         /* map values and tunnel informations */
+        tunnel_map_key_t key;
         struct tunnel_info* tn;
         __u8 tun_type;
         __u64 flags = 0; // keep redirect flags zero for now
+
+        /* Packet is coming from outside so source and dest must be inversed */
+        key.s_addr = inner_ip->daddr;
+        key.d_addr = inner_ip->saddr;
 
         tn = bpf_map_lookup_elem(&mptm_tunnel_info_map, &key);
         if(tn == NULL) {

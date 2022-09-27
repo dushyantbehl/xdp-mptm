@@ -408,9 +408,9 @@ int do_get(mptm_info *mptm) {
     dump_tunnel_info(ti);
 
     printf("Ingrese redirect is from iface %d to %d\n",
-            mptm->veth_iface, egress_redirect_if);
+            ti->veth_iface, egress_redirect_if);
     printf("Egrese redirect is from iface %d to %d\n",
-            mptm->eth0_iface, ingress_redirect_if);
+            ti->eth0_iface, ingress_redirect_if);
 
     return EXIT_OK;
 }
