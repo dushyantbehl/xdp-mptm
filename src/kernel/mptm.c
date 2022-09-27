@@ -60,7 +60,6 @@ int mptm_push_tunnel(struct xdp_md *ctx) {
     struct tunnel_info* tn;
     tunnel_map_key_t key;
     __u8 tun_type;
-    __u32 daddr;
 
     void *data = (void *)((long)ctx->data);
     void *data_end = (void *)((long)ctx->data_end);
@@ -116,8 +115,8 @@ int mptm_pop_tunnel(struct xdp_md *ctx) {
         goto out;
 
     /* Packet is coming from outside so source and dest must be inversed */
-    key.s_addr = daddr;
-    key.d_addr = saddr;
+    key.s_addr = ip->daddr;
+    key.d_addr = ip->saddr;
 
     if (udp->dest == BE_GEN_DSTPORT) { // GENEVE packet
         // Check inner packet if there is a rule corresponding to

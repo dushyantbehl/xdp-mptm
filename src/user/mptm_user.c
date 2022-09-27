@@ -466,7 +466,7 @@ int do_add(mptm_info *mptm) {
         return ret;
     }
 
-    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &egress_if, ingress_if, 0, REDIRECT_IF_DEVMAP);
+    ret = update_map(mptm->redirect_if_devmap_fd, MAP_ADD, &egress_if, &ingress_if, 0, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to add inverse redirect if\n");
         return ret;
@@ -496,7 +496,7 @@ int main(int argc, char **argv) {
 
     /* Open the map for geneve config */
     int redirect_if_devmap_fd = load_bpf_mapfile(PIN_BASE_DIR, REDIRECT_IF_DEVMAP);
-    if (redirect_map_fd < 0) {
+    if (redirect_if_devmap_fd < 0) {
           eprintf("cannot open redirect if devmap\n");
         return EXIT_FAIL_BPF;
     }
