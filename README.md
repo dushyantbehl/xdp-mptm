@@ -35,71 +35,73 @@ $ bpftool prog loadall build/mptm_extras.o /sys/fs/bpf/mptm_extras type xdp -d
 $ ls /sys/fs/bpf/
 mptm  mptm_extras
 $ bpftool prog show
-655: xdp  name mptm_push_tunne  tag add336b96316eaae  gpl
-        loaded_at 2022-09-17T11:15:44+0000  uid 0
-        xlated 4680B  jited 2573B  memlock 8192B  map_ids 392,393,394,395
-        btf_id 495
-656: xdp  name mptm_pop_tunnel  tag 3a9514c008460de8  gpl
-        loaded_at 2022-09-17T11:15:44+0000  uid 0
-        xlated 2248B  jited 1337B  memlock 4096B  map_ids 392,393,394,395
-        btf_id 495
-660: xdp  name mptm_redirect  tag 45631072cbc131ed  gpl
-        loaded_at 2022-09-17T11:15:50+0000  uid 0
-        xlated 64B  jited 44B  memlock 4096B  map_ids 396
-        btf_id 500
-661: xdp  name mptm_pass  tag 3b185187f1855c4c  gpl
-        loaded_at 2022-09-17T11:15:50+0000  uid 0
+780: xdp  name mptm_push_tunne  tag 20ce27c6fc8477bf  gpl
+        loaded_at 2022-09-27T08:56:09+0000  uid 0
+        xlated 2928B  jited 1600B  memlock 4096B  map_ids 465,466,467
+        btf_id 590
+781: xdp  name mptm_pop_tunnel  tag de198a4b68746d76  gpl
+        loaded_at 2022-09-27T08:56:09+0000  uid 0
+        xlated 1416B  jited 866B  memlock 4096B  map_ids 465,466,467
+        btf_id 590
+785: xdp  name mptm_redirect  tag 45631072cbc131ed  gpl
+        loaded_at 2022-09-27T08:56:32+0000  uid 0
+        xlated 64B  jited 44B  memlock 4096B  map_ids 468
+        btf_id 595
+786: xdp  name mptm_pass  tag 3b185187f1855c4c  gpl
+        loaded_at 2022-09-27T08:56:32+0000  uid 0
         xlated 16B  jited 18B  memlock 4096B
-        btf_id 500
+        btf_id 595
 ```
 
-Attach to the interfaces ingress
+Attach to the interfaces
 
 ```
-$ bpftool net attach xdp id 655 dev veth-node1 overwrite
-$ bpftool net attach xdp id 660 dev geneve1 overwrite
+$ bpftool net attach xdp id 780 dev veth-node1 overwrite
+$ bpftool net attach xdp id 781 dev ens4f0 overwrite
 ```
 
 ```
 $ ip a | ack --passthru 'xdp'
-146: veth-node1@if145: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 `xdp/id:655` qdisc noqueue state UP group default qlen 1000
+2: ens4f0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 3000 xdp/id:781 qdisc mq state UP group default qlen 1000
+    link/ether 68:05:ca:d4:7c:ac brd ff:ff:ff:ff:ff:ff
+    altname enp88s0f0
+    inet 10.30.30.1/32 scope global ens4f0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::6a05:caff:fed4:7cac/64 scope link 
+       valid_lft forever preferred_lft forever
+146: veth-node1@if145: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 3000 xdp/id:780 qdisc noqueue state UP group default qlen 1000
     link/ether 62:d6:7b:d3:e8:9f brd ff:ff:ff:ff:ff:ff link-netns vns1
     inet6 fe80::60d6:7bff:fed3:e89f/64 scope link 
        valid_lft forever preferred_lft forever
-147: geneve1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 `xdpgeneric/id:660` qdisc noqueue state UNKNOWN group default qlen 1000
-    link/ether ea:bf:69:38:7f:14 brd ff:ff:ff:ff:ff:ff
-    inet6 fe80::e8bf:69ff:fe38:7f14/64 scope link 
-       valid_lft forever preferred_lft forever
 ```
 
-Note:- If we need to perform redirect from `veth` to `eth0` interface, we need to attach an `XDP_PASS` program on the `eth0` interface.
+Note:- As per Netdev 0x13 talk (Veth XDP: XDP for containers)[https://www.files.netdevconf.info/f/a63b274e50f943a0a474/?dl=1] we need to attach an XDP Program to the vpeer and redirect pakcets to veth for optimal performance.
+So we attach `XDP_PASS` to the veth-peer interface as follows.
 
 ```
-$ bpftool net attach xdp id 661 dev ens4f0 overwrite
+$ ip netns exec vns1 bpftool net attach xdp id 786 dev veth-ns1 overwrite
 ```
 
 ## Programming the maps
 
 Check the maps created using below command
 ```
-$ $ bpftool map show
-392: hash  name mptm_tunnel_inf  flags 0x0
+$ bpftool map show
+465: hash  name mptm_tunnel_inf  flags 0x0
         key 8B  value 64B  max_entries 1024  memlock 151552B
-393: hash  name mptm_tunnel_red  flags 0x0
-        key 4B  value 4B  max_entries 2048  memlock 172032B
-394: devmap  name mptm_tunnel_red  flags 0x80
+466: devmap  name mptm_tunnel_red  flags 0x80
         key 4B  value 4B  max_entries 2048  memlock 16384B
-395: percpu_array  name xdp_stats_map  flags 0x0
+467: percpu_array  name xdp_stats_map  flags 0x0
         key 4B  value 16B  max_entries 5  memlock 8192B
-396: devmap  name mptm_redirect_d  flags 0x80
+468: devmap  name mptm_redirect_d  flags 0x80
         key 4B  value 4B  max_entries 1024  memlock 8192B
-401: array  flags 0x0
+473: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-403: array  name pid_iter.rodata  flags 0x480
+475: array  name pid_iter.rodata  flags 0x480
         key 4B  value 4B  max_entries 1  memlock 8192B
-        btf_id 510  frozen
-        pids bpftool(4072625)
-404: array  flags 0x0
+        btf_id 605  frozen
+        pids bpftool(2019515)
+476: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
 ```
 
@@ -110,12 +112,10 @@ command output lists the *map_ids* being used by the programs, if you see multip
 listed with program.
 
 ```
-$ bpftool map pin id 392 /sys/fs/bpf/mptm_tunnel_info_map
-$ bpftool map pin id 393 /sys/fs/bpf/mptm_redirect_info_map
-$ bpftool map pin id 394 /sys/fs/bpf/mptm_redirect_if_devmap
-$ bpftool map pin id 396 /sys/fs/bpf/redirect_devmap
+$ bpftool map pin id 465 /sys/fs/bpf/mptm_tunnel_info_map
+$ bpftool map pin id 466 /sys/fs/bpf/mptm_redirect_if_devmap
 $ ls /sys/fs/bpf/
-mptm  mptm_extras  mptm_redirect_if_devmap  mptm_redirect_info_map  mptm_tunnel_info_map  redirect_devmap
+mptm  mptm_extras  mptm_redirect_if_devmap  mptm_tunnel_info_map
 ```
 
 We need to populate the maps with information regarding tunnel outer packet header, ip address to mangle, mac addresses and interfaces to look for.
@@ -163,53 +163,43 @@ opt: y arg: 10.250.1.101
 opt: a arg: ADD 
 Arguments verified
 Opened bpf map file /sys/fs/bpf/mptm_tunnel_info_map at fd 3
-Opened bpf map file /sys/fs/bpf/mptm_redirect_info_map at fd 4
-Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 5
+Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 4
 Creating tunnel info object......created
 action is add, map fd 3 adding mptm_tunnel_info_map entry
-action is add, map fd 4 adding mptm_redirect_info_map entry
-action is add, map fd 5 adding mptm_redirect_if_devmap entry
-action is add, map fd 4 adding mptm_redirect_info_map entry
-action is add, map fd 5 adding mptm_redirect_if_devmap entry
+action is add, map fd 4 adding mptm_redirect_if_devmap entry
+action is add, map fd 4 adding mptm_redirect_if_devmap entry
 
 ```
 
 Check if map entry got created by - 
 
 ```
-$ root@tcnode6:/home/dushyant/xdp-mptm# bpftool map show
-392: hash  name mptm_tunnel_inf  flags 0x0
+$ bpftool map show
+465: hash  name mptm_tunnel_inf  flags 0x0
         key 8B  value 64B  max_entries 1024  memlock 151552B
-393: hash  name mptm_tunnel_red  flags 0x0
-        key 4B  value 4B  max_entries 2048  memlock 172032B
-394: devmap  name mptm_tunnel_red  flags 0x80
+466: devmap  name mptm_tunnel_red  flags 0x80
         key 4B  value 4B  max_entries 2048  memlock 16384B
-395: percpu_array  name xdp_stats_map  flags 0x0
+467: percpu_array  name xdp_stats_map  flags 0x0
         key 4B  value 16B  max_entries 5  memlock 8192B
-396: devmap  name mptm_redirect_d  flags 0x80
+468: devmap  name mptm_redirect_d  flags 0x80
         key 4B  value 4B  max_entries 1024  memlock 8192B
-429: array  flags 0x0
+477: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-431: array  name pid_iter.rodata  flags 0x480
+479: array  name pid_iter.rodata  flags 0x480
         key 4B  value 4B  max_entries 1  memlock 8192B
-        btf_id 545  frozen
-        pids bpftool(24012)
-432: array  flags 0x0
+        btf_id 610  frozen
+        pids bpftool(2020270)
+480: array  flags 0x0
         key 4B  value 32B  max_entries 1  memlock 4096B
-$ root@tcnode6:/home/dushyant/xdp-mptm# bpftool map dump id 392
+$ bpftool map dump id 465
 key:
-0a 1e 1e 01 0a 1e 1e 02
+0a fa 01 64 0a fa 01 65
 value:
-00 03 01 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 03 01 00 00 02 00 00  00 92 00 00 00 00 00 00
 00 00 00 00 00 00 00 00  c8 22 00 00 0a 1e 1e 02
 0a 1e 1e 01 9e 5c c2 da  ee 5b 68 05 ca d4 7c ac
 68 05 ca d4 5c 28 00 00  00 00 00 00 00 00 00 00
 Found 1 element
-root@tcnode6:/home/dushyant/xdp-mptm# bpftool map dump id 393
-key: 0a 1e 1e 01  value: 02 00 00 00
-key: 00 00 00 00  value: 08 00 00 00
-key: 0a 1e 1e 02  value: 92 00 00 00
-Found 3 elements
 ```
 
 and so on...
@@ -223,42 +213,30 @@ opt: y arg: 10.250.1.101
 opt: a arg: GET 
 Arguments verified
 Opened bpf map file /sys/fs/bpf/mptm_tunnel_info_map at fd 3
-Opened bpf map file /sys/fs/bpf/mptm_redirect_info_map at fd 4
-Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 5
+Opened bpf map file /sys/fs/bpf/mptm_redirect_if_devmap at fd 4
 Tunnel info element - {
         debug = 0
         redirect = 1
         flags = 0
+        eth0_iface = 2
+        veth_iface = 146
         tunnel_type = GENEVE
         vlan_id = 0
         source_port = 8904
         source_mac = 68:5:ca:d4:7c:ac
         outer_dest_mac = 68:5:ca:d4:5c:28
         inner_dest_mac = 9e:5c:c2:da:ee:5b
-        dest_addr = 10.30.30.2
-        source_addr = 10.30.30.1
+        dest_ip = 10.30.30.2
+        source_ip = 10.30.30.1
 }
-Ingrese redirect iface for key 10.250.1.101 is 2
-Egrese redirect iface for key 10.250.1.100 is 146
+Ingrese redirect is from iface 0 to 2
+Egrese redirect is from iface 0 to 146
 ```
 
 In case you need to delete the entry action can be set to `DEL`
 
 ```
 $ ./build/mptm_user --inner_src_ip 10.250.1.100 --inner_dst_ip 10.250.1.101 -a DEL
-```
-
-Add an entry to the redirect map for reverse path traffic as,
-
-`mptm_extras_user -i IFACE_ID_OF_GENEVE0_NODE1 -r IFACE_ID_OF_VETH_NODE1_ROOTNS -o ADD`
-
-```
-$ ./build/mptm_extras_user -i 147 -r 146 -a ADD
-opt: i arg: 147 
-opt: r arg: 146 
-opt: a arg: ADD 
-ingress iface:147, redirect iface:146, action:ADD
-action is add, map fd 3 adding redirect_devmap entry
 ```
 
 ## Generating Traffic:

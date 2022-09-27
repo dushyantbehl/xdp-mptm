@@ -354,8 +354,8 @@ void dump_tunnel_info(mptm_tunnel_info *tn) {
     printf("\tdebug = %u\n", tn->debug);
     printf("\tredirect = %u\n", tn->redirect);
     printf("\tflags = %u\n", tn->flags);
-    printf("\eth0_iface = %d\n", tn->eth0_iface);
-    printf("\veth_iface = %d\n", tn->veth_iface);
+    printf("\teth0_iface = %d\n", tn->eth0_iface);
+    printf("\tveth_iface = %d\n", tn->veth_iface);
     printf("\ttunnel_type = %s\n", get_tunnel_name(tn->tunnel_type));
     switch (tn->tunnel_type)
     {
@@ -393,13 +393,13 @@ int do_get(mptm_info *mptm) {
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_if_devmap_fd, &mptm->veth_iface, &egress_redirect_if, REDIRECT_IF_DEVMAP);
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &ti->veth_iface, &egress_redirect_if, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to lookup redirect ingress interface\n");
         return ret;
     }
 
-    ret = lookup_map(mptm->redirect_if_devmap_fd, &mptm->eth0_iface, &ingress_redirect_if, REDIRECT_IF_DEVMAP);
+    ret = lookup_map(mptm->redirect_if_devmap_fd, &ti->eth0_iface, &ingress_redirect_if, REDIRECT_IF_DEVMAP);
     if (ret != EXIT_OK) {
         eprintf("failed to lookup redirect egress interface\n");
         return ret;
@@ -409,7 +409,7 @@ int do_get(mptm_info *mptm) {
 
     printf("Ingrese redirect is from iface %d to %d\n",
             mptm->veth_iface, egress_redirect_if);
-    printf("Egrese redirect is from iface %d to %dn",
+    printf("Egrese redirect is from iface %d to %d\n",
             mptm->eth0_iface, ingress_redirect_if);
 
     return EXIT_OK;
@@ -418,8 +418,17 @@ int do_get(mptm_info *mptm) {
 int do_delete(mptm_info *mptm) {
     int ret;
 
-    uint32_t ingress_if = mptm->veth_iface;
-    uint32_t egress_if = mptm->eth0_iface;
+    uint32_t ingress_if, egress_if;
+    mptm_tunnel_info *ti = (mptm_tunnel_info *)malloc(sizeof(mptm_tunnel_info));
+
+    ret = lookup_map(mptm->tunnel_map_fd, mptm->tun_key, ti, TUNNEL_INFO_MAP);
+    if (ret != EXIT_OK) {
+        eprintf("failed to lookup tunnel info\n");
+        return ret;
+    }
+
+    ingress_if = ti->veth_iface;
+    egress_if = ti->eth0_iface;
 
     ret = update_map(mptm->tunnel_map_fd, MAP_DELETE, mptm->tun_key, NULL, 0, TUNNEL_INFO_MAP);
     if (ret != EXIT_OK) {
