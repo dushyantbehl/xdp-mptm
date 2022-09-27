@@ -17,7 +17,7 @@ This XDP-tutorial leverages [libbpf](https://github.com/libbpf/libbpf/).
 Run ``make`` in root folder.
 
 # How to Run
-We provide setup files to create system according to the picture above
+We provide setup files to create a test system
 
 [setup-node.sh](./setup/setup-node.sh) is the script which contains bash script to setup system.
 
