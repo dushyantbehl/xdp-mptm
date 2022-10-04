@@ -10,7 +10,7 @@ For detailed description of depedencies, intent, usage etc. please check the blo
 
 ## Based on libbpf
 
-This XDP-tutorial leverages [libbpf](https://github.com/libbpf/libbpf/).
+This code leverages [libbpf](https://github.com/libbpf/libbpf/).
 
 ## Build
 
