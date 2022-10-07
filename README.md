@@ -17,7 +17,7 @@ This code leverages [libbpf](https://github.com/libbpf/libbpf/).
 Run ``make`` in root folder.
 
 # How to Run
-![System setup for testing](docs/mptm_arch.png "System setup for testing")
+![System setup for testing](docs/mptm_arch.jpg "System setup for testing")
 
 We provide setup files to create a test system
 
