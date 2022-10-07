@@ -17,6 +17,8 @@ This code leverages [libbpf](https://github.com/libbpf/libbpf/).
 Run ``make`` in root folder.
 
 # How to Run
+![System setup for testing](docs/mptm_arch.png "System setup for testing")
+
 We provide setup files to create a test system
 
 [setup-node.sh](./setup/setup-node.sh) is the script which contains bash script to setup system.
