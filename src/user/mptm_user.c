@@ -269,7 +269,7 @@ int parse_params(int argc, char *argv[], mptm_info *mptm) {
     return verify_args(mptm);
 }
 
-static inline tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
+tunnel_map_key_t *__get_tunnel_info_map_key(mptm_info *mptm, bool inverted) {
     tunnel_map_key_t *key = (tunnel_map_key_t *)malloc(sizeof(tunnel_map_key_t));;
 
     /*

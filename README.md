@@ -33,11 +33,11 @@ $ bpftool prog loadall build/mptm_extras.o /sys/fs/bpf/mptm_extras type xdp -d
 $ ls /sys/fs/bpf/
 mptm  mptm_extras
 $ bpftool prog show
-780: xdp  name mptm_push_tunne  tag 20ce27c6fc8477bf  gpl
+780: xdp  name mptm_encap_xdp  tag 20ce27c6fc8477bf  gpl
         loaded_at 2022-09-27T08:56:09+0000  uid 0
         xlated 2928B  jited 1600B  memlock 4096B  map_ids 465,466,467
         btf_id 590
-781: xdp  name mptm_pop_tunnel  tag de198a4b68746d76  gpl
+781: xdp  name mptm_decap_xdp  tag de198a4b68746d76  gpl
         loaded_at 2022-09-27T08:56:09+0000  uid 0
         xlated 1416B  jited 866B  memlock 4096B  map_ids 465,466,467
         btf_id 590

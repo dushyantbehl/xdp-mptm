@@ -37,7 +37,7 @@ extern struct bpf_map_def mptm_tunnel_iface_map;
 /* Parse eth, ip and udp headers of a packet.
  * If any header is passed as NULL then stop processing and return.
  */
-static __always_inline int parse_pkt_headers(void *data, void *data_end,
+static __ALWAYS_INLINE__ int parse_pkt_headers(void *data, void *data_end,
                                              struct ethhdr **ethhdr,
                                              struct iphdr **iphdr,
                                              struct udphdr **udphdr)

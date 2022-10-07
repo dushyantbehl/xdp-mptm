@@ -21,7 +21,7 @@ struct bpf_map_def SEC("maps") mptm_extras_redirect_devmap = {
 };
 
 SEC("mptm_redirect_xdp")
-int mptm_extras_redirect(struct xdp_md *ctx) {
+int mptm_redirect(struct xdp_md *ctx) {
     __u64 flags = 0;
     __u32 key = ctx->ingress_ifindex;
 
@@ -29,7 +29,7 @@ int mptm_extras_redirect(struct xdp_md *ctx) {
 }
 
 SEC("mptm_pass_xdp")
-int mptm_extras_pass(struct xdp_md *ctx) {
+int mptm_pass(struct xdp_md *ctx) {
     return XDP_PASS;
 }
 

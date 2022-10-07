@@ -32,11 +32,10 @@
 #include <kernel/lib/geneve.h>
 #include <kernel/lib/mptm-debug.h>
 
-#define DEFAULT_TTL     64
-#define BE_GEN_DSTPORT  0xc117
+#define DEFAULT_TTL        64
+#define BE_GENEVE_DSTPORT  0xc117
 
-__ALWAYS_INLINE__
-static inline void set_dst_mac(void *data, unsigned char *dst_mac)
+static __ALWAYS_INLINE__ void set_dst_mac(void *data, unsigned char *dst_mac)
 {
     unsigned short *p = data;
     unsigned short *dst = (unsigned short *)dst_mac;
@@ -46,8 +45,7 @@ static inline void set_dst_mac(void *data, unsigned char *dst_mac)
     p[2] = dst[2];
 }
 
-__ALWAYS_INLINE__
-static inline void set_src_mac(void *data, unsigned char *src_mac)
+static __ALWAYS_INLINE__ void set_src_mac(void *data, unsigned char *src_mac)
 {
     unsigned short *p = data;
     unsigned short *src = (unsigned short *)src_mac;
@@ -57,8 +55,7 @@ static inline void set_src_mac(void *data, unsigned char *src_mac)
     p[5] = src[2];
 }
 
-__ALWAYS_INLINE__
-static inline __u16 csum_fold_helper(__u64 csum)
+static __ALWAYS_INLINE__ __u16 csum_fold_helper(__u64 csum)
 {
     int i;
 #pragma unroll
@@ -69,8 +66,7 @@ static inline __u16 csum_fold_helper(__u64 csum)
     return ~csum;
 }
 
-__ALWAYS_INLINE__
-static inline void ipv4_csum_inline(void *iph, __u64 *csum)
+static __ALWAYS_INLINE__ void ipv4_csum_inline(void *iph, __u64 *csum)
 {
     __u16 *next_iph_u16 = (__u16 *)iph;
 #pragma clang loop unroll(full)
@@ -83,8 +79,9 @@ static inline void ipv4_csum_inline(void *iph, __u64 *csum)
 /* Pushes a new GENEVE header after the Ethernet header.
  *  Returns 0 on success, -1 on failure.
  */
-static __always_inline int geneve_tag_push(struct xdp_md *ctx,
-        struct ethhdr *eth, geneve_tunnel_info* tn)
+static __ALWAYS_INLINE__ int __encap_geneve(struct xdp_md *ctx,
+                                          struct ethhdr *eth,
+                                          geneve_tunnel_info* tn)
 {
     int gnv_hdr_size = sizeof(struct genevehdr);
     int udp_hdr_size = sizeof(struct udphdr);
@@ -170,7 +167,7 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     //For now make check 0
     udp->check = 0;
     udp->source = tn->source_port; // TODO: a hash value based on inner IP packet
-    udp->dest = BE_GEN_DSTPORT;
+    udp->dest = BE_GENEVE_DSTPORT;
     udp->len = bpf_htons(outer_udp_payload);
 
     __builtin_memset(geneve, 0, gnv_hdr_size);
@@ -194,18 +191,18 @@ static __always_inline int geneve_tag_push(struct xdp_md *ctx,
     return XDP_PASS;
 }
 
-static __always_inline int trigger_geneve_push(struct xdp_md *ctx,
-                                               struct ethhdr *eth,
-                                               mptm_tunnel_info *tn) {
+static __ALWAYS_INLINE__ int encap_geneve(struct xdp_md *ctx,
+                                        struct ethhdr *eth,
+                                        mptm_tunnel_info *tn) {
      // typecast the union to geneve
     struct geneve_info *geneve = (geneve_tunnel_info *)(&tn->tnl_info.geneve);
-    return geneve_tag_push(ctx, eth, geneve);
+    return __encap_geneve(ctx, eth, geneve);
 }
 
 /* Use bpf.h function bpf_skb_vlan_push to remove dependency on xdp tutorials */
-static __always_inline int trigger_vlan_push(struct xdp_md *ctx,
-                                             struct ethhdr *eth,
-                                             mptm_tunnel_info *tn) {
+static __ALWAYS_INLINE__ int encap_vlan(struct xdp_md *ctx,
+                                      struct ethhdr *eth,
+                                      mptm_tunnel_info *tn) {
     // typecast the union to vlan
     struct vlan_info *vlan = (vlan_tunnel_info *)(&tn->tnl_info.vlan);
 
