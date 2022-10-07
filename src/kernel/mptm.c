@@ -80,10 +80,10 @@ int mptm_encap(struct xdp_md *ctx) {
 
     tun_type = tn->tunnel_type;
     if (tun_type == VLAN) {
-        action = trigger_vlan_push(ctx, eth, tn);
+        action = encap_vlan(ctx, eth, tn);
     }
     else if (tun_type == GENEVE) {
-        action = trigger_geneve_push(ctx, eth, tn);
+        action = encap_geneve(ctx, eth, tn);
     } else {
         bpf_debug("[ERR] tunnel type is unknown");
         goto out;
@@ -113,7 +113,7 @@ int mptm_decap(struct xdp_md *ctx) {
     if (parse_pkt_headers(data, data_end, &eth, &ip, &udp) != 0)
         goto out;
 
-    if (udp->dest == BE_GEN_DSTPORT) { // GENEVE packet
+    if (udp->dest == BE_GENEVE_DSTPORT) { // GENEVE packet
         // Check inner packet if there is a rule corresponding to
         // inner source which will be source for us as we received the packet
         int outer_hdr_size = sizeof(struct genevehdr) +
@@ -167,3 +167,4 @@ int mptm_decap(struct xdp_md *ctx) {
 }
 
 char _license[] SEC("license") = "GPL";
+

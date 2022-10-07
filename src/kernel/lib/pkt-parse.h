@@ -23,6 +23,7 @@
 
 #include <kernel/lib/map-defs.h>
 #include <kernel/lib/mptm-debug.h>
+#include <kernel/lib/compiler.h>
 
 /* Inspired from Katran.
  * ETH_P_IP and ETH_P_IPV6 in Big Endian format.
